@@ -18,7 +18,8 @@
   "license": "MIT",
   "dependencies": {
     "@dfinity/agent": "^0.20.2",
-    "@dfinity/auth-client": "^0.20.2"
+    "@dfinity/auth-client": "^0.20.2",
+    "@dfinity/identity": "^0.20.2"
   },
   "peerDependencies": {
     "react": ">=18.0.0"
