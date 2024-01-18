@@ -158,6 +158,7 @@ export function InternetIdentityProvider({
       identityProvider: process.env.II_URL,
       onSuccess: onLoginSuccess,
       onError: onLoginError,
+      maxTimeToLive: BigInt(3_600_000_000_000), // Defaults to 1 hour
       ...loginOptions,
     };
 
