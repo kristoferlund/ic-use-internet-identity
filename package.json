@@ -2,6 +2,21 @@
   "name": "ic-use-internet-identity",
   "version": "0.0.1",
   "description": "",
+  "author": "Kristofer Lund <kristofer@kristoferlund.se>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kristoferlund/ic-use-internet-identity-demo"
+  },
+  "bugs": "https://github.com/kristoferlund/ic-use-internet-identity-demo/issues",
+  "homepage": "https://github.com/kristoferlund/ic-use-internet-identity-demo",
+  "keywords": [
+    "dfinity",
+    "ic",
+    "internet computer",
+    "internet identity",
+    "react",
+    "hook"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -13,8 +28,6 @@
     "dev:tsc": "tsc --watch --preserveWatchOutput",
     "dev:esbuild": "npm run build --watch"
   },
-  "keywords": [],
-  "author": "",
   "license": "MIT",
   "dependencies": {
     "@dfinity/agent": "^0.20.2",
