@@ -4,8 +4,8 @@
 
 `ic-use-internet-identity` is a hook that makes it easy to integrate Internet Identity into your React application. It provides a simple interface for logging in and out with the Internet Identity service.
 
-![npm](https://img.shields.io/npm/v/ic-use-internet-identity)
-![npm](https://img.shields.io/npm/dw/ic-use-internet-identity)
+[![version][version-image]][npm-link]
+[![downloads][dl-image]][npm-link]
 
 ## Features
 
@@ -15,13 +15,18 @@
 
 ## Table of Contents
 
-- [Installation](#installation)
-- [Usage](#usage)
-  - [1. Setup the `InternetIdentityProvider` component](#1-setup-the-internetidentityprovider-component)
-  - [2. Connect the `login()` function to a button](#2-connect-the-login-function-to-a-button)
-  - [3. Use the `identity` context variable to access the identity](#3-use-the-identity-context-variable-to-access-the-identity)
-- [InternetIdentityProvider props](#internetidentityprovider-props)
-- [useInternetIdentity interface](#useinternetidentity-interface)
+- [ic-use-internet-identity](#ic-use-internet-identity)
+  - [Features](#features)
+  - [Table of Contents](#table-of-contents)
+  - [Installation](#installation)
+  - [Usage](#usage)
+    - [1. Setup the `InternetIdentityProvider` component](#1-setup-the-internetidentityprovider-component)
+    - [2. Connect the `login()` function to a button](#2-connect-the-login-function-to-a-button)
+    - [3. Use the `identity` context variable to access the identity](#3-use-the-identity-context-variable-to-access-the-identity)
+  - [InternetIdentityProvider props](#internetidentityprovider-props)
+  - [useInternetIdentity interface](#useinternetidentity-interface)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ## Installation
 
@@ -197,3 +202,8 @@ Contributions are welcome. Please submit your pull requests or open issues to pr
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for more details.
+
+[version-image]: https://img.shields.io/npm/v/ic-use-internet-identity
+[dl-image]: https://img.shields.io/npm/dw/ic-use-internet-identity
+[npm-link]: https://www.npmjs.com/package/ic-use-internet-identity
+````
