@@ -61,6 +61,29 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 ```
 
+> [!TIP]  
+> `InternetIdentityProvider` defaults to using the main Internet Identity instance running on `https://identity.ic0.app`. If you want to use a local instance of the Internet Identity, override the `II_URL` environment variable with the URL of the local instance.
+> 
+> Example for Vite, using the [vite-plugin-environment](https://www.npmjs.com/package/vite-plugin-environment) plugin:
+> 
+> ```js
+> // vite.config.js
+> import environment from "vite-plugin-environment";
+>
+> process.env.II_URL =
+>  process.env.DFX_NETWORK === "local"
+>    ? `http://${process.env.INTERNET_IDENTITY_CANISTER_ID}.localhost:4943/`
+>    : `https://identity.ic0.app`;
+>
+> export default defineConfig({
+>   // ...
+>   plugins: [
+>     environment(["II_URL"]),
+>   ],
+>   // ...
+> });
+
+
 ### 2. Connect the `login()` function to a button
 
 Calling `login()` opens up the Internet Identity service in a new window where the user is asked to sign in. Once signed in, the window closes and the identity is stored in local storage. The identity is then available in the `identity` context variable.
