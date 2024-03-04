@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.8] - 2024-03-04
+
+### Changed
+- Upgraded @dfinity/xxx dependencies to latest versions.
+
 ## [0.0.7] - 2024-01-31
 
 No changes. Upgrader to sync version numbers with [ic-use-siwe-identity](https://github.com/kristoferlund/ic-siwe/tree/main/packages/ic-use-siwe-identity).
