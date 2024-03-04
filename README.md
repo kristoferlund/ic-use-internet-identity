@@ -66,7 +66,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 > 
 > Example for Vite, using the [vite-plugin-environment](https://www.npmjs.com/package/vite-plugin-environment) plugin:
 > 
-> ```js
+> ```javascript
 > // vite.config.js
 > import environment from "vite-plugin-environment";
 >
