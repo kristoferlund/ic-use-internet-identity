@@ -31,7 +31,7 @@
 ## Installation
 
 ```bash
-npm install ic-use-internet-identity
+npm install ic-use-internet-identity @dfinity/agent @dfinity/auth-client @dfinity/identity
 ```
 
 ## Usage

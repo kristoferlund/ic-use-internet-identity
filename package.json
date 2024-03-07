@@ -1,6 +1,6 @@
 {
   "name": "ic-use-internet-identity",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Hook that makes it easy to integrate IC Internet Identity into your React application.",
   "author": "Kristofer Lund <kristofer@kristoferlund.se>",
   "repository": {
@@ -29,13 +29,12 @@
     "dev:esbuild": "npm run build --watch"
   },
   "license": "MIT",
-  "dependencies": {
-    "@dfinity/agent": "^1.0.1",
-    "@dfinity/auth-client": "^1.0.1",
-    "@dfinity/identity": "^1.0.1"
-  },
+  "dependencies": {},
   "peerDependencies": {
-    "react": ">=18.0.0"
+    "react": ">=18.0.0",
+    "@dfinity/agent": ">=1.0.1",
+    "@dfinity/auth-client": ">=1.0.1",
+    "@dfinity/identity": ">=1.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",

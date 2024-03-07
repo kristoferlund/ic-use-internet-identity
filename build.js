@@ -6,6 +6,12 @@ esbuild.build({
   splitting: true,
   outdir: "dist",
   format: "esm",
-  external: ["react", "react-dom"],
+  external: [
+    "react",
+    "react-dom",
+    "@dfinity/agent",
+    "@dfinity/auth-client",
+    "@dfinity/identity",
+  ],
   plugins: [],
 });
