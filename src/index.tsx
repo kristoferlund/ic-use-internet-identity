@@ -71,9 +71,6 @@ export function InternetIdentityProvider({
   // Effect runs on mount. Creates an AuthClient and attempts to load a saved identity.
   useEffect(() => {
     (async () => {
-      // If the auth client is already initialized, do nothing
-      if (state.authClient) return;
-
       // Add some default options to the auth client
       const options: AuthClientCreateOptions = {
         idleOptions: {
@@ -105,7 +102,7 @@ export function InternetIdentityProvider({
 
       setState((prevState) => ({
         ...prevState,
-        isLoading: false,
+        isInitializing: false,
       }));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

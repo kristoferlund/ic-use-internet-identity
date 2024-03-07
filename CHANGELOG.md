@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.10] - 2024-03-07
+
+### Fixed
+- Bug that caused the `isInitializing` state to not be set to `false` after initialization.
+
 ## [0.0.9] - 2024-03-07
 
 ### Changed
