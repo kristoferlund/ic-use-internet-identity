@@ -61,11 +61,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 ```
 
-> [!TIP]  
+> [!TIP]
 > `InternetIdentityProvider` defaults to using the main Internet Identity instance running on `https://identity.ic0.app`. If you want to use a local instance of the Internet Identity, override the `II_URL` environment variable with the URL of the local instance.
-> 
+>
 > Example for Vite, using the [vite-plugin-environment](https://www.npmjs.com/package/vite-plugin-environment) plugin:
-> 
+>
 > ```javascript
 > // vite.config.js
 > import environment from "vite-plugin-environment";
@@ -178,6 +178,29 @@ export default function Actors({ children }: { children: ReactNode }) {
   children: ReactNode;
 }
 ````
+
+## LoginOptions
+
+```ts
+export type LoginOptions = {
+  /**
+   * Expiration of the authentication in nanoseconds
+   * @default  BigInt(8) hours * BigInt(3_600_000_000_000) nanoseconds
+   */
+  maxTimeToLive?: bigint;
+  /**
+   * Auth Window feature config string
+   * @example "toolbar=0,location=0,menubar=0,width=500,height=500,left=100,top=100"
+   */
+  windowOpenerFeatures?: string;
+  /**
+   * Origin for Identity Provider to use while generating the delegated identity. For II, the derivation origin must authorize this origin by setting a record at `<derivation-origin>/.well-known/ii-alternative-origins`.
+   * @see https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc
+   */
+  derivationOrigin?: string | URL;
+};
+```
+
 
 ## useInternetIdentity interface
 
