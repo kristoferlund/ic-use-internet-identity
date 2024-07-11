@@ -241,6 +241,17 @@ export type InternetIdentityContextType = {
 };
 ```
 
+## Updates
+
+See the [CHANGELOG](CHANGELOG.md) for details on updates.
+
+## Author
+
+- [kristofer@kristoferlund.se](mailto:kristofer@kristoferlund.se)
+- Twitter: [@kristoferlund](https://twitter.com/kristoferlund)
+- Discord: kristoferkristofer
+- Telegram: [@kristoferkristofer](https://t.me/kristoferkristofer)
+
 ## Contributing
 
 Contributions are welcome. Please submit your pull requests or open issues to propose changes or report bugs.

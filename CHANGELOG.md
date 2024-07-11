@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.11] - 2024-07-11
+
+### Added
+- Login support for `derivationOrigin`
+
+### Changed
+- Upgraded minimum required versions of @dfinity/xxx dependencies
+
 ## [0.0.10] - 2024-03-07
 
 ### Fixed
