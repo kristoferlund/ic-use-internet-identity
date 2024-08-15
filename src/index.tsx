@@ -96,6 +96,7 @@ export function InternetIdentityProvider({
           setState((prevState) => ({
             ...prevState,
             identity,
+            loginStatus: "success",
           }));
         }
       }
