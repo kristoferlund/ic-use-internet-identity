@@ -31,7 +31,13 @@
 ## Installation
 
 ```bash
-npm install ic-use-internet-identity @dfinity/agent @dfinity/auth-client @dfinity/identity
+pnpm install ic-use-internet-identity
+```
+
+The hook also requires the following `@dfinity/x` packages to be installed with a version of at least `2.1.2`:
+
+```bash
+pnpm install @dfinity/agent @dfinity/auth-client @dfinity/identity
 ```
 
 ## Usage
@@ -61,8 +67,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 ```
 
-> [!TIP]
-> `InternetIdentityProvider` defaults to using the main Internet Identity instance running on `https://identity.ic0.app`. If you want to use a local instance of the Internet Identity, override the `II_URL` environment variable with the URL of the local instance.
+> [!TIP] > `InternetIdentityProvider` defaults to using the main Internet Identity instance running on `https://identity.ic0.app`. If you want to use a local instance of the Internet Identity, override the `II_URL` environment variable with the URL of the local instance.
 >
 > Example for Vite, using the [vite-plugin-environment](https://www.npmjs.com/package/vite-plugin-environment) plugin:
 >
@@ -71,18 +76,19 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 > import environment from "vite-plugin-environment";
 >
 > process.env.II_URL =
->  process.env.DFX_NETWORK === "local"
->    ? `http://${process.env.INTERNET_IDENTITY_CANISTER_ID}.localhost:4943/`
->    : `https://identity.ic0.app`;
+>   process.env.DFX_NETWORK === "local"
+>     ? `http://${process.env.CANISTER_ID_INTERNET_IDENTIY}.localhost:4943`
+>     : `https://identity.ic0.app`;
 >
 > export default defineConfig({
 >   // ...
 >   plugins: [
+>     // ...
 >     environment(["II_URL"]),
 >   ],
 >   // ...
 > });
-
+> ```
 
 ### 2. Connect the `login()` function to a button
 
@@ -134,7 +140,7 @@ import { useInternetIdentity } from "ic-use-internet-identity";
 const actorContext = createActorContext<_SERVICE>();
 export const useActor = createUseActorHook<_SERVICE>(actorContext);
 
-export default function Actors({ children }: { children: ReactNode }) {
+ eexport default function Actors({ children }: { children: ReactNode }) {
   const { identity } = useInternetIdentity();
 
   return (
@@ -170,7 +176,8 @@ export default function Actors({ children }: { children: ReactNode }) {
    */
   createOptions?: AuthClientCreateOptions;
 
-  /** Options that determine the behaviour of the {@link AuthClient} login call. */
+  /** Options that determine the behaviour of the {@link AuthClient} login call. These options are a subset of
+   * the {@link AuthClientLoginOptions}. */
   loginOptions?: LoginOptions;
 
   /** The child components that the InternetIdentityProvider will wrap. This allows any child
@@ -189,18 +196,25 @@ export type LoginOptions = {
    */
   maxTimeToLive?: bigint;
   /**
-   * Auth Window feature config string
-   * @example "toolbar=0,location=0,menubar=0,width=500,height=500,left=100,top=100"
+   * If present, indicates whether or not the Identity Provider should allow the user to authenticate and/or register using a temporary key/PIN identity. Authenticating dapps may want to prevent users from using Temporary keys/PIN identities because Temporary keys/PIN identities are less secure than Passkeys (webauthn credentials) and because Temporary keys/PIN identities generally only live in a browser database (which may get cleared by the browser/OS).
    */
-  windowOpenerFeatures?: string;
+  allowPinAuthentication?: boolean;
   /**
    * Origin for Identity Provider to use while generating the delegated identity. For II, the derivation origin must authorize this origin by setting a record at `<derivation-origin>/.well-known/ii-alternative-origins`.
    * @see https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc
    */
   derivationOrigin?: string | URL;
+  /**
+   * Auth Window feature config string
+   * @example "toolbar=0,location=0,menubar=0,width=500,height=500,left=100,top=100"
+   */
+  windowOpenerFeatures?: string;
+  /**
+   * Extra values to be passed in the login request during the authorize-ready phase
+   */
+  customValues?: Record<string, unknown>;
 };
 ```
-
 
 ## useInternetIdentity interface
 
@@ -263,4 +277,7 @@ This project is licensed under the MIT License. See the LICENSE file for more de
 [version-image]: https://img.shields.io/npm/v/ic-use-internet-identity
 [dl-image]: https://img.shields.io/npm/dw/ic-use-internet-identity
 [npm-link]: https://www.npmjs.com/package/ic-use-internet-identity
-````
+
+```
+
+```
