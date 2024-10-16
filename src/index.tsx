@@ -8,6 +8,7 @@ import {
   type AuthClientLoginOptions,
 } from "@dfinity/auth-client";
 import type { State } from "./state.type";
+import type { LoginOptions } from "./login-options.type";
 
 /**
  * React context for managing the login state and the Internet Identity.
@@ -55,8 +56,10 @@ export function InternetIdentityProvider({
    */
   createOptions?: AuthClientCreateOptions;
 
-  /** Options that determine the behaviour of the {@link AuthClient} login call. */
-  loginOptions?: AuthClientLoginOptions;
+  /** Options that determine the behaviour of the {@link AuthClient} login call. These options are a subset of 
+   * the {@link AuthClientLoginOptions}. 
+   */
+  loginOptions?: LoginOptions;
 
   /** The child components that the InternetIdentityProvider will wrap. This allows any child
    * component to access the authentication context provided by the InternetIdentityProvider. */
