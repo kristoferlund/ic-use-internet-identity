@@ -119,7 +119,7 @@ export function LoginButton() {
 
 The `identity` context variable contains the identity of the currently logged in user. The identity is available after successfully loading the identity from local storage or completing the login process.
 
-The preferred way to use the identity is to connect it to the [ic-use-actor](https://www.npmjs.com/kristoferlund/ic-use-actor) hook. The hook provides a typed interface to the canister methods as well as interceptor functions for handling errors etc.
+The preferred way to use the identity is to connect it to the [ic-use-actor](https://www.npmjs.com/package/ic-use-actor) hook. The hook provides a typed interface to the canister methods as well as interceptor functions for handling errors etc.
 
 ```jsx
 // Actors.tsx
@@ -277,7 +277,3 @@ This project is licensed under the MIT License. See the LICENSE file for more de
 [version-image]: https://img.shields.io/npm/v/ic-use-internet-identity
 [dl-image]: https://img.shields.io/npm/dw/ic-use-internet-identity
 [npm-link]: https://www.npmjs.com/package/ic-use-internet-identity
-
-```
-
-```
