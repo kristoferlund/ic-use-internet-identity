@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.2.0 - 2025-01-07
+
+### Changed
+
+- Replaced the state handling. Instead of using React Context, the hook now uses [https://www.npmjs.com/package/@xstate/store](xstate/store) for state management.
+
+### Fixed
+
+- Replacing the state handling fixed some edge case bugs where the state could become out of sync when switching between different identites.
+
 ## 0.1.0 - 2024-10-16
 
 ### Changed
