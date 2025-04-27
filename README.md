@@ -37,7 +37,7 @@ pnpm install ic-use-internet-identity
 The hook also requires the following `@dfinity/x` packages to be installed with a version of at least `2.1.2`:
 
 ```bash
-pnpm install @dfinity/agent @dfinity/auth-client @dfinity/identity
+pnpm install @dfinity/agent @dfinity/auth-client @dfinity/identity @dfinity/candid
 ```
 
 ## Usage
@@ -77,7 +77,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 >
 > process.env.II_URL =
 >   process.env.DFX_NETWORK === "local"
->     ? `http://${process.env.CANISTER_ID_INTERNET_IDENTIY}.localhost:4943`
+>     ? `http://${process.env.CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
 >     : `https://identity.ic0.app`;
 >
 > export default defineConfig({
@@ -140,7 +140,7 @@ import { useInternetIdentity } from "ic-use-internet-identity";
 const actorContext = createActorContext<_SERVICE>();
 export const useActor = createUseActorHook<_SERVICE>(actorContext);
 
- eexport default function Actors({ children }: { children: ReactNode }) {
+ export default function Actors({ children }: { children: ReactNode }) {
   const { identity } = useInternetIdentity();
 
   return (
