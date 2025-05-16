@@ -10,7 +10,7 @@ import {
 import type { LoginOptions } from "./login-options.type";
 import type { Identity } from "@dfinity/agent";
 import type { InternetIdentityContextType } from "./context.type";
-import {DelegationIdentity, isDelegationValid} from "@dfinity/identity";
+import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
 interface Context {
   providerComponentPresent: boolean;
