@@ -97,7 +97,7 @@ function login() {
   const context = store.getSnapshot().context;
 
   if (!context.providerComponentPresent) {
-    console.error(
+    throw new Error(
       "The InternetIdentityProvider component is not present. Make sure to wrap your app with it.",
     );
   }
@@ -107,14 +107,19 @@ function login() {
   if (!authClient) {
     // AuthClient should have a value at this point, unless `login` was called immediately with e.g. useEffect,
     // doing so would be incorrect since a browser popup window can only be reliably opened on user interaction.
-    throw new Error("AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.");
+    throw new Error(
+      "AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.",
+    );
   }
 
   const identity = authClient.getIdentity();
 
   // We avoid using `authClient.isAuthenticated` since that's async and would potentially block the popup window,
   // instead we work around this by checking the principal and delegation validity, which gives us the same info.
-  if (!identity.getPrincipal().isAnonymous() && isDelegationValid((identity as DelegationIdentity).getDelegation())) {
+  if (
+    !identity.getPrincipal().isAnonymous() &&
+    isDelegationValid((identity as DelegationIdentity).getDelegation())
+  ) {
     throw new Error("User is already authenticated");
   }
 
@@ -146,7 +151,7 @@ function onLoginSuccess() {
 /**
  * Login was not successful. Sets loginError.
  */
-function onLoginError(error?: string | undefined) {
+function onLoginError(error?: string) {
   store.send({ type: "setLoginStatus", loginStatus: "error" });
   store.send({ type: "setLoginError", loginError: new Error(error) });
 }
@@ -224,7 +229,7 @@ export function InternetIdentityProvider({
 }) {
   // Effect runs on mount. Creates an AuthClient and attempts to load a saved identity.
   useEffect(() => {
-    (async () => {
+    void (async () => {
       store.send({
         type: "setProviderComponentPresent",
         providerComponentPresent: true,
@@ -233,15 +238,11 @@ export function InternetIdentityProvider({
       store.send({ type: "setCreateOptions", createOptions });
       store.send({ type: "setLoginOptions", loginOptions });
       let authClient = store.getSnapshot().context.authClient;
-      if (!authClient) {
-        authClient = await createAuthClient();
-      }
+      authClient ??= await createAuthClient();
       const isAuthenticated = await authClient.isAuthenticated();
       if (isAuthenticated) {
         const identity = authClient.getIdentity();
-        if (identity) {
-          store.send({ type: "setIdentity", identity });
-        }
+        store.send({ type: "setIdentity", identity });
       }
       store.send({ type: "setIsInitializing", isInitializing: false });
     })();
