@@ -109,7 +109,7 @@ function login() {
     // doing so would be incorrect since a browser popup window can only be reliably opened on user interaction.
     throw new Error("AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.");
   }
-  
+
   const identity = authClient.getIdentity();
 
   // We avoid using `authClient.isAuthenticated` since that's async and would potentially block the popup window,
@@ -165,7 +165,6 @@ async function clear() {
   store.send({ type: "setIdentity", identity: undefined });
   store.send({ type: "setLoginStatus", loginStatus: "idle" });
   store.send({ type: "setLoginError", loginError: undefined });
-  store.send({ type: "setAuthClient", authClient: undefined });
 }
 
 /**
