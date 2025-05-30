@@ -34,7 +34,7 @@
 pnpm install ic-use-internet-identity
 ```
 
-The hook also requires the following `@dfinity/x` packages to be installed with a version of at least `2.1.2`:
+The hook also requires the following `@dfinity/x` packages to be installed with a version of at least `2.4.1`:
 
 ```bash
 pnpm install @dfinity/agent @dfinity/auth-client @dfinity/identity @dfinity/candid
