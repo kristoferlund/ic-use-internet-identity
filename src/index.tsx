@@ -10,6 +10,7 @@ import {
 import type { LoginOptions } from "./login-options.type";
 import type { Identity } from "@dfinity/agent";
 import type { InternetIdentityContextType } from "./context.type";
+import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
 interface Context {
   providerComponentPresent: boolean;
@@ -92,7 +93,7 @@ async function createAuthClient(): Promise<AuthClient> {
 /**
  * Connect to Internet Identity to login the user.
  */
-async function login() {
+function login() {
   const context = store.getSnapshot().context;
 
   if (!context.providerComponentPresent) {
@@ -101,13 +102,19 @@ async function login() {
     );
   }
 
-  let authClient = context.authClient;
+  const authClient = context.authClient;
 
   if (!authClient) {
-    authClient = await createAuthClient();
+    // AuthClient should have a value at this point, unless `login` was called immediately with e.g. useEffect,
+    // doing so would be incorrect since a browser popup window can only be reliably opened on user interaction.
+    throw new Error("AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.");
   }
+  
+  const identity = authClient.getIdentity();
 
-  if (await authClient.isAuthenticated()) {
+  // We avoid using `authClient.isAuthenticated` since that's async and would potentially block the popup window,
+  // instead we work around this by checking the principal and delegation validity, which gives us the same info.
+  if (!identity.getPrincipal().isAnonymous() && isDelegationValid((identity as DelegationIdentity).getDelegation())) {
     throw new Error("User is already authenticated");
   }
 
@@ -121,7 +128,7 @@ async function login() {
   };
 
   store.send({ type: "setLoginStatus", loginStatus: "logging-in" });
-  authClient.login(options);
+  return authClient.login(options);
 }
 
 /**
