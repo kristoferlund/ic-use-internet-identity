@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## 0.3.0 - 2025-05-30
+
+### Changed
+
+- Upgraded dependencies, now requiring at minimum `v2.4.1` of `@dfinity/x` libraries.
+- The `login` function is no longer marked as `async` to prevent an issue with Safari browser that blocks opening the login window.
+
 ## 0.2.0 - 2025-01-07
 
 ### Changed
