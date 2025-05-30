@@ -1,5 +1,8 @@
 {
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "*.js"
+  ],
   "compilerOptions": {
     /* Base Options: */
     "esModuleInterop": true,
@@ -17,7 +20,11 @@
     /* If NOT transpiling with TypeScript: */
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "lib": ["DOM", "ES2018", "DOM.Iterable"],
+    "lib": [
+      "DOM",
+      "ES2018",
+      "DOM.Iterable"
+    ],
     "jsx": "react-jsx"
   }
 }

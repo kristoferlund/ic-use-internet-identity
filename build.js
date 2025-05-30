@@ -1,6 +1,6 @@
 import esbuild from "esbuild";
 
-esbuild.build({
+void esbuild.build({
   entryPoints: ["./src/index.tsx"],
   bundle: true,
   splitting: true,
