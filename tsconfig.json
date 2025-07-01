@@ -1,7 +1,6 @@
 {
   "include": [
     "src/**/*",
-    "*.js"
   ],
   "compilerOptions": {
     /* Base Options: */

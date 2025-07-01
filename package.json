@@ -1,14 +1,14 @@
 {
   "name": "ic-use-internet-identity",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Hook that makes it easy to integrate IC Internet Identity into your React application.",
   "author": "Kristofer Lund <kristofer@kristoferlund.se>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kristoferlund/ic-use-internet-identity-demo"
+    "url": "https://github.com/kristoferlund/ic-use-internet-identity"
   },
-  "bugs": "https://github.com/kristoferlund/ic-use-internet-identity-demo/issues",
-  "homepage": "https://github.com/kristoferlund/ic-use-internet-identity-demo",
+  "bugs": "https://github.com/kristoferlund/ic-use-internet-identity/issues",
+  "homepage": "https://github.com/kristoferlund/ic-use-internet-identity",
   "keywords": [
     "dfinity",
     "ic",
