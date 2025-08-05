@@ -332,5 +332,3 @@ This project is licensed under the MIT License. See the LICENSE file for more de
 [npm-link]: https://www.npmjs.com/package/ic-use-internet-identity
 
 ```
-
-```
