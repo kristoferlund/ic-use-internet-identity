@@ -10,7 +10,7 @@
 ## Features
 
 - **Cached Identity**: The identity is cached in local storage and restored on page load. This allows the user to stay logged in even if the page is refreshed.
-- **Login progress**: State varibles are provided to indicate whether the user is logged in, logging in, or logged out.
+- **Login progress**: State variables are provided to indicate whether the user is logged in, logging in, or logged out.
 - **Works with ic-use-actor**: Plays nicely with [ic-use-actor](https://www.npmjs.com/package/ic-use-actor) that provides easy access to canister methods.
 
 ## Table of Contents
@@ -20,11 +20,18 @@
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
   - [Usage](#usage)
+    - [Prerequisites](#prerequisites)
     - [1. Setup the `InternetIdentityProvider` component](#1-setup-the-internetidentityprovider-component)
     - [2. Connect the `login()` function to a button](#2-connect-the-login-function-to-a-button)
     - [3. Use the `identity` context variable to access the identity](#3-use-the-identity-context-variable-to-access-the-identity)
   - [InternetIdentityProvider props](#internetidentityprovider-props)
+  - [LoginOptions](#loginoptions)
   - [useInternetIdentity interface](#useinternetidentity-interface)
+  - [Error Handling](#error-handling)
+  - [Security Considerations](#security-considerations)
+  - [Troubleshooting](#troubleshooting)
+  - [Updates](#updates)
+  - [Author](#author)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -34,7 +41,7 @@
 pnpm install ic-use-internet-identity
 ```
 
-The hook also requires the following `@dfinity/x` packages to be installed with a version of at least `2.4.1`:
+The hook also requires the following `@dfinity/x` packages to be installed with a version of at least `3.1.0`:
 
 ```bash
 pnpm install @dfinity/agent @dfinity/auth-client @dfinity/identity @dfinity/candid
@@ -67,7 +74,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 ```
 
-> [!TIP] > `InternetIdentityProvider` defaults to using the main Internet Identity instance running on `https://identity.ic0.app`. If you want to use a local instance of the Internet Identity, override the `II_URL` environment variable with the URL of the local instance.
+> [!IMPORTANT]
+> **Required Environment Variable**: You MUST set the `II_URL` environment variable or the login will fail. The library does not provide a default fallback.
+>
+> - Production: `https://identity.ic0.app`
+> - Local development: `http://${CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
 >
 > Example for Vite, using the [vite-plugin-environment](https://www.npmjs.com/package/vite-plugin-environment) plugin:
 >
@@ -92,7 +103,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
 ### 2. Connect the `login()` function to a button
 
-Calling `login()` opens up the Internet Identity service in a new window where the user is asked to sign in. Once signed in, the window closes and the identity is stored in local storage. The identity is then available in the `identity` context variable.
+Calling `login()` opens up the Internet Identity service in a new popup window where the user is asked to sign in. Once signed in, the window closes and the identity is stored in local storage. The identity is then available in the `identity` context variable.
+
+> [!WARNING]
+> **User Interaction Required**: The `login()` function MUST be called in response to a user interaction (e.g., button click). Calling it in `useEffect` or similar will fail because browsers block popup windows that aren't triggered by user actions.
 
 Use the `loginStatus` state variable to track the status of the login process. The `loginStatus` can be one of the following values: `idle`, `logging-in`, `success`, or `error`.
 
@@ -192,7 +206,7 @@ export const useActor = createUseActorHook<_SERVICE>(actorContext);
 export type LoginOptions = {
   /**
    * Expiration of the authentication in nanoseconds
-   * @default  BigInt(8) hours * BigInt(3_600_000_000_000) nanoseconds
+   * @default  BigInt(3_600_000_000_000) nanoseconds (1 hour)
    */
   maxTimeToLive?: bigint;
   /**
@@ -254,6 +268,45 @@ export type InternetIdentityContextType = {
   identity?: Identity;
 };
 ```
+
+## Error Handling
+
+The library can throw several specific errors that you should handle:
+
+```tsx
+import { useInternetIdentity } from "ic-use-internet-identity";
+
+export function LoginComponent() {
+  const { login, loginError, isLoginError } = useInternetIdentity();
+
+  const handleLogin = async () => {
+    try {
+      await login();
+    } catch (error) {
+      // Possible errors:
+      // - "The InternetIdentityProvider component is not present"
+      // - "AuthClient is not initialized yet, make sure to call `login` on user interaction"
+      // - "User is already authenticated"
+      console.error("Login failed:", error);
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={handleLogin}>Login</button>
+      {isLoginError && (
+        <div>Login error: {loginError?.message}</div>
+      )}
+    </div>
+  );
+}
+```
+
+## Security Considerations
+
+- **Delegation Expiry**: By default, delegations expire after 1 hour. Monitor `identity` for changes and handle re-authentication.
+- **Secure Storage**: Identities are stored in browser local storage. Consider the security implications for your use case.
+- **Session Management**: The library disables automatic logout on idle by default. Consider your app's security requirements.
 
 ## Updates
 

@@ -1,7 +1,7 @@
 export type LoginOptions = {
   /**
    * Expiration of the authentication in nanoseconds
-   * @default  BigInt(8) hours * BigInt(3_600_000_000_000) nanoseconds
+   * @default  BigInt(3_600_000_000_000) nanoseconds (1 hour)
    */
   maxTimeToLive?: bigint;
   /**
@@ -22,5 +22,4 @@ export type LoginOptions = {
    * Extra values to be passed in the login request during the authorize-ready phase
    */
   customValues?: Record<string, unknown>;
-}
-
+};

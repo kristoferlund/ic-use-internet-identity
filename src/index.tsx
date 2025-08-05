@@ -78,7 +78,7 @@ async function createAuthClient(): Promise<AuthClient> {
   const createOptions = store.getSnapshot().context.createOptions;
   const options: AuthClientCreateOptions = {
     idleOptions: {
-      // Default behaviour of this hook is not to logout and reload window on indentity expiration
+      // Default behaviour of this hook is not to logout and reload window on identity expiration
       disableDefaultIdleCallback: true,
       disableIdle: true,
       ...createOptions?.idleOptions,
