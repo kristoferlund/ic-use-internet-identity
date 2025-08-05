@@ -108,7 +108,7 @@ Calling `login()` opens up the Internet Identity service in a new popup window w
 > [!WARNING]
 > **User Interaction Required**: The `login()` function MUST be called in response to a user interaction (e.g., button click). Calling it in `useEffect` or similar will fail because browsers block popup windows that aren't triggered by user actions.
 
-Use the `loginStatus` state variable to track the status of the login process. The `loginStatus` can be one of the following values: `idle`, `logging-in`, `success`, or `error`.
+Use the `loginStatus` and `loginError` state variables to track the status of the login process. All errors are handled through the hook's state - no need for try/catch blocks.
 
 ```jsx
 // LoginButton.tsx
@@ -116,15 +116,22 @@ Use the `loginStatus` state variable to track the status of the login process. T
 import { useInternetIdentity } from "ic-use-internet-identity";
 
 export function LoginButton() {
-  const { login, loginStatus } = useInternetIdentity();
+  const { login, loginStatus, loginError, isLoginError } = useInternetIdentity();
 
   const disabled = loginStatus === "logging-in" || loginStatus === "success";
   const text = loginStatus === "logging-in" ? "Logging in..." : "Login";
 
   return (
-    <button onClick={login} disabled={disabled}>
-      {text}
-    </button>
+    <div>
+      <button onClick={login} disabled={disabled}>
+        {text}
+      </button>
+      {isLoginError && (
+        <div style={{ color: "red" }}>
+          Login failed: {loginError?.message}
+        </div>
+      )}
+    </div>
   );
 }
 ```
@@ -271,7 +278,7 @@ export type InternetIdentityContextType = {
 
 ## Error Handling
 
-The library can throw several specific errors that you should handle:
+The library handles all errors through its state management system. You don't need try/catch blocks - simply monitor the `loginError` and `isLoginError` state:
 
 ```tsx
 import { useInternetIdentity } from "ic-use-internet-identity";

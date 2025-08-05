@@ -37,37 +37,10 @@ const initialContext: Context = {
 const store = createStore({
   context: initialContext,
   on: {
-    setProviderComponentPresent: {
-      providerComponentPresent: (
-        _,
-        event: { providerComponentPresent: boolean },
-      ) => event.providerComponentPresent,
-    },
-    setAuthClient: {
-      authClient: (_, event: { authClient?: AuthClient }) => event.authClient,
-    },
-    setCreateOptions: {
-      createOptions: (_, event: { createOptions?: AuthClientCreateOptions }) =>
-        event.createOptions,
-    },
-    setLoginOptions: {
-      loginOptions: (_, event: { loginOptions?: LoginOptions }) =>
-        event.loginOptions,
-    },
-    setIsInitializing: {
-      isInitializing: (_, event: { isInitializing: boolean }) =>
-        event.isInitializing,
-    },
-    setLoginStatus: {
-      loginStatus: (_, event: { loginStatus: LoginStatus }) =>
-        event.loginStatus,
-    },
-    setIdentity: {
-      identity: (_, event: { identity?: Identity }) => event.identity,
-    },
-    setLoginError: {
-      loginError: (_, event: { loginError?: Error }) => event.loginError,
-    },
+    setState: (context, event: Partial<Context>) => ({
+      ...context,
+      ...event,
+    }),
   },
 });
 
@@ -86,8 +59,20 @@ async function createAuthClient(): Promise<AuthClient> {
     ...createOptions,
   };
   const authClient = await AuthClient.create(options);
-  store.send({ type: "setAuthClient", authClient });
+  store.send({ type: "setState", authClient });
   return authClient;
+}
+
+/**
+ * Helper function to set login error state and return resolved promise.
+ */
+function setLoginErrorAndReturn(errorMessage: string): Promise<void> {
+  store.send({
+    type: "setState",
+    loginStatus: "error" as LoginStatus,
+    loginError: new Error(errorMessage),
+  });
+  return Promise.resolve();
 }
 
 /**
@@ -97,30 +82,28 @@ function login() {
   const context = store.getSnapshot().context;
 
   if (!context.providerComponentPresent) {
-    throw new Error(
+    return setLoginErrorAndReturn(
       "The InternetIdentityProvider component is not present. Make sure to wrap your app with it.",
     );
   }
 
   const authClient = context.authClient;
-
   if (!authClient) {
     // AuthClient should have a value at this point, unless `login` was called immediately with e.g. useEffect,
     // doing so would be incorrect since a browser popup window can only be reliably opened on user interaction.
-    throw new Error(
+    return setLoginErrorAndReturn(
       "AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.",
     );
   }
 
   const identity = authClient.getIdentity();
-
-  // We avoid using `authClient.isAuthenticated` since that's async and would potentially block the popup window,
-  // instead we work around this by checking the principal and delegation validity, which gives us the same info.
   if (
+    // We avoid using `authClient.isAuthenticated` since that's async and would potentially block the popup window,
+    // instead we work around this by checking the principal and delegation validity, which gives us the same info.
     !identity.getPrincipal().isAnonymous() &&
     isDelegationValid((identity as DelegationIdentity).getDelegation())
   ) {
-    throw new Error("User is already authenticated");
+    return setLoginErrorAndReturn("User is already authenticated");
   }
 
   const loginOptions = context.loginOptions;
@@ -132,7 +115,7 @@ function login() {
     ...loginOptions,
   };
 
-  store.send({ type: "setLoginStatus", loginStatus: "logging-in" });
+  store.send({ type: "setState", loginStatus: "logging-in" as LoginStatus });
   return authClient.login(options);
 }
 
@@ -144,16 +127,22 @@ function onLoginSuccess() {
   if (!identity) {
     throw new Error("Identity not found after successful login");
   }
-  store.send({ type: "setIdentity", identity });
-  store.send({ type: "setLoginStatus", loginStatus: "success" });
+  store.send({
+    type: "setState",
+    identity,
+    loginStatus: "success" as LoginStatus,
+  });
 }
 
 /**
  * Login was not successful. Sets loginError.
  */
 function onLoginError(error?: string) {
-  store.send({ type: "setLoginStatus", loginStatus: "error" });
-  store.send({ type: "setLoginError", loginError: new Error(error) });
+  store.send({
+    type: "setState",
+    loginStatus: "error" as LoginStatus,
+    loginError: new Error(error),
+  });
 }
 
 /**
@@ -167,9 +156,12 @@ async function clear() {
   }
   await authClient.logout();
 
-  store.send({ type: "setIdentity", identity: undefined });
-  store.send({ type: "setLoginStatus", loginStatus: "idle" });
-  store.send({ type: "setLoginError", loginError: undefined });
+  store.send({
+    type: "setState",
+    identity: undefined,
+    loginStatus: "idle" as LoginStatus,
+    loginError: undefined,
+  });
 }
 
 /**
@@ -231,20 +223,20 @@ export function InternetIdentityProvider({
   useEffect(() => {
     void (async () => {
       store.send({
-        type: "setProviderComponentPresent",
+        type: "setState",
         providerComponentPresent: true,
+        isInitializing: true,
+        createOptions,
+        loginOptions,
       });
-      store.send({ type: "setIsInitializing", isInitializing: true });
-      store.send({ type: "setCreateOptions", createOptions });
-      store.send({ type: "setLoginOptions", loginOptions });
       let authClient = store.getSnapshot().context.authClient;
       authClient ??= await createAuthClient();
       const isAuthenticated = await authClient.isAuthenticated();
       if (isAuthenticated) {
         const identity = authClient.getIdentity();
-        store.send({ type: "setIdentity", identity });
+        store.send({ type: "setState", identity });
       }
-      store.send({ type: "setIsInitializing", isInitializing: false });
+      store.send({ type: "setState", isInitializing: false });
     })();
   }, [createOptions, loginOptions]);
 
