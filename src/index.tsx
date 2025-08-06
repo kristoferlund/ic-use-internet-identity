@@ -78,6 +78,16 @@ function setError(errorMessage: string) {
 
 /**
  * Connect to Internet Identity to login the user.
+ *
+ * This function initiates the Internet Identity authentication process by:
+ * 1. Validating prerequisites (provider present, auth client initialized, user not already authenticated)
+ * 2. Opening a popup window to the Identity Provider
+ * 3. Setting status to "logging-in" and handling the result through state management
+ *
+ * All results (success/error) are communicated through the hook's state - monitor `status`, `error`, and `identity`.
+ *
+ * @throws No exceptions - all errors are handled via state management
+ * @returns void - results available through hook state
  */
 function login(): void {
   const context = store.getSnapshot().context;
@@ -201,6 +211,23 @@ export const useInternetIdentity = (): InternetIdentityContext => {
  * The InternetIdentityProvider component makes the saved identity available
  * after page reloads. It also allows you to configure default options
  * for AuthClient and login.
+ *
+ * By default, the component uses the main Internet Identity service at
+ * https://identity.ic0.app. For local development, you can override this
+ * by setting the identityProvider in loginOptions:
+ *
+ * @example
+ * ```tsx
+ * <InternetIdentityProvider
+ *   loginOptions={{
+ *     identityProvider: process.env.DFX_NETWORK === "local"
+ *       ? `http://${process.env.CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
+ *       : "https://identity.ic0.app"
+ *   }}
+ * >
+ *   <App />
+ * </InternetIdentityProvider>
+ * ```
  */
 export function InternetIdentityProvider({
   children,
