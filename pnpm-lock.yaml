@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@xstate/store':
-        specifier: ^2.6.2
-        version: 2.6.2(react@18.3.1)
+        specifier: ^3.8.5
+        version: 3.8.5(react@18.3.1)
     devDependencies:
       '@dfinity/agent':
         specifier: ^3.1.0
@@ -394,10 +394,10 @@ packages:
     resolution: {integrity: sha512-ldgiJ+VAhQCfIjeOgu8Kj5nSxds0ktPOSO9p4+0VDH2R2pLvQraaM5Oen2d7NxzMCm+Sn/vJT+mv2H5u6b/3fA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@xstate/store@2.6.2':
-    resolution: {integrity: sha512-zznGTWU+tmhbD0UUxPLy5FmxvceBNyMsN1Tuy7UMJAH9NuaQWj4/B2L+EcO6FxI2b2CNyzk1PL5mZ8cDpBFpMw==}
+  '@xstate/store@3.8.5':
+    resolution: {integrity: sha512-XzuEv/xWkoLDh6PMHX+uTCTRzPMi96/hwhg263h7d4JMPlL+0FIa/5xIyx45+zxHcWzM7OLAhr29kGW7qPNoYA==}
     peerDependencies:
-      react: ^18.2.0 || ^19.0.0-0
+      react: ^18.2.0 || ^19.0.0
       solid-js: ^1.7.6
     peerDependenciesMeta:
       react:
@@ -1560,7 +1560,7 @@ snapshots:
       '@typescript-eslint/types': 8.39.0
       eslint-visitor-keys: 4.2.1
 
-  '@xstate/store@2.6.2(react@18.3.1)':
+  '@xstate/store@3.8.5(react@18.3.1)':
     optionalDependencies:
       react: 18.3.1
 
