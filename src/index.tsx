@@ -19,7 +19,6 @@ export interface StoreContext {
   authClient?: AuthClient;
   createOptions?: AuthClientCreateOptions;
   loginOptions?: LoginOptions;
-  isInitializing: boolean;
   status: Status;
   error?: Error;
   identity?: Identity;
@@ -32,8 +31,7 @@ const initialContext: StoreContext = {
   authClient: undefined,
   createOptions: undefined,
   loginOptions: undefined,
-  isInitializing: false,
-  status: "idle",
+  status: "initializing",
   error: undefined,
   identity: undefined,
 };
@@ -190,7 +188,7 @@ export const useInternetIdentity = (): InternetIdentityContext => {
     login,
     clear,
     status: context.status,
-    isInitializing: context.isInitializing,
+    isInitializing: context.status === "initializing",
     isIdle: context.status === "idle",
     isLoggingIn: context.status === "logging-in",
     isLoginSuccess: context.status === "success",
@@ -241,7 +239,7 @@ export function InternetIdentityProvider({
         store.send({
           type: "setState",
           providerComponentPresent: true,
-          isInitializing: true,
+          status: "initializing" as const,
           createOptions,
           loginOptions,
         });
@@ -260,7 +258,7 @@ export function InternetIdentityProvider({
             error instanceof Error ? error : new Error("Initialization failed"),
         });
       } finally {
-        store.send({ type: "setState", isInitializing: false });
+        store.send({ type: "setState", status: "idle" as const });
       }
     })();
   }, [createOptions, loginOptions]);

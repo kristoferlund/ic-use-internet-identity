@@ -1,6 +1,11 @@
 import type { Identity } from "@dfinity/agent";
 
-export type Status = "error" | "logging-in" | "success" | "idle";
+export type Status =
+  | "initializing"
+  | "idle"
+  | "logging-in"
+  | "success"
+  | "error";
 
 export type InternetIdentityContext = {
   /** The identity is available after successfully loading the identity from local storage
@@ -17,20 +22,19 @@ export type InternetIdentityContext = {
    * identity is loaded on mount. */
   status: Status;
 
-  /** Is set to `true` on mount until a stored identity is loaded from local storage or
-   * none is found. */
+  /** `status === "initializing"` */
   isInitializing: boolean;
 
-  /** `loginStatus === "idle"` */
+  /** `status === "idle"` */
   isIdle: boolean;
 
-  /** `loginStatus === "logging-in"` */
+  /** `status === "logging-in"` */
   isLoggingIn: boolean;
 
-  /** `loginStatus === "success"` */
+  /** `status === "success"` */
   isLoginSuccess: boolean;
 
-  /** `loginStatus === "error"` */
+  /** `status === "error"` */
   isError: boolean;
 
   /** Login error. Unsurprisingly. */

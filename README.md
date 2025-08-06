@@ -117,7 +117,8 @@ The `login()` function initiates the Internet Identity authentication process. H
 
 The login process follows a predictable status flow:
 
-- **`"idle"`** → Initial state, ready to login
+- **`"initializing"`** → Library is loading and checking for existing authentication
+- **`"idle"`** → Ready to login
 - **`"logging-in"`** → Login popup is open, user is authenticating
 - **`"success"`** → Login completed successfully, `identity` is available
 - **`"error"`** → Login failed, check `error` for details
@@ -134,6 +135,12 @@ export function LoginButton() {
 
   const renderButton = () => {
     switch (status) {
+      case "initializing":
+        return (
+          <button disabled>
+            ⏳ Initializing...
+          </button>
+        );
       case "idle":
         return (
           <button onClick={login}>
@@ -182,6 +189,7 @@ The hook also provides convenient boolean properties for common status checks:
 
 ```jsx
 const {
+  isInitializing, // status === "initializing"
   isIdle,        // status === "idle"
   isLoggingIn,   // status === "logging-in"
   isLoginSuccess, // status === "success"
@@ -189,8 +197,12 @@ const {
 } = useInternetIdentity();
 
 // Example usage
+if (isInitializing) {
+  // Show initial loading state
+}
+
 if (isLoggingIn) {
-  // Show loading spinner
+  // Show login spinner
 }
 
 if (isLoginSuccess && identity) {
@@ -301,7 +313,12 @@ This means you can use all properties from `AuthClientLoginOptions` except `onSu
 ## useInternetIdentity interface
 
 ```ts
-export type Status = "error" | "logging-in" | "success" | "idle";
+export type Status =
+  | "initializing"
+  | "idle"
+  | "logging-in"
+  | "success"
+  | "error";
 
 export type InternetIdentityContext = {
   /** The identity is available after successfully loading the identity from local storage
@@ -318,8 +335,7 @@ export type InternetIdentityContext = {
    * identity is loaded on mount. */
   status: Status;
 
-  /** Is set to `true` on mount until a stored identity is loaded from local storage or
-   * none is found. */
+  /** `status === "initializing"` */
   isInitializing: boolean;
 
   /** `status === "idle"` */

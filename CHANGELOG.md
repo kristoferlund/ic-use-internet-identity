@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-08-06
+
+### ⚠️ Breaking Changes
+
+- **Renamed interface**: `InternetIdentityContextType` → `InternetIdentityContext` ([6bad9b7](https://github.com/kristoferlund/ic-use-internet-identity/commit/6bad9b7c29211618b1834ddd0f8750561bfd01a1))
+- **Renamed properties**: Multiple property names have changed for better consistency:
+  - `loginStatus` → `status`
+  - `loginError` → `error`
+  - `isLoginError` → `isError`
+  - `isLoginIdle` → `isIdle`
+
+- **Function signatures changed**:
+  - `login()` now returns `void` instead of `Promise<void>`
+  - `clear()` now returns `void` instead of `Promise<void>`
+- **LoginOptions interface**: Now extends `AuthClientLoginOptions` with `onSuccess`, `onError` omitted ([4f04748](https://github.com/kristoferlund/ic-use-internet-identity/commit/4f04748396db12004eefa9ea7de08edb270ce15c))
+
+### Added
+
+- **Default identity provider**: Library now defaults to `https://identity.ic0.app` without requiring environment variable configuration ([4f04748](https://github.com/kristoferlund/ic-use-internet-identity/commit/4f04748396db12004eefa9ea7de08edb270ce15c))
+- **Extended LoginOptions**: All `AuthClientLoginOptions` properties are now available (except `onSuccess`, `onError`)
+- **Comprehensive error handling**: All errors now flow through state management instead of thrown exceptions
+
+### Changed
+
+- **Upgraded dependencies**: Updated minimum required `@dfinity/*` packages from `>=2.4.1` to `>=3.1.0` ([828a57c](https://github.com/kristoferlund/ic-use-internet-identity/commit/828a57c8641b7c9578aeb17a6932000a9e2c520f))
+- **Improved error handling**: Consistent error handling pattern - all errors set via state instead of mixed throw/state approach ([9305299](https://github.com/kristoferlund/ic-use-internet-identity/commit/9305299057e5d53dd46142e4dfa65a55ef4cc62c))
+- **Simplified state management**: Reduced XState store boilerplate with generic `setState` action
+- **Enhanced type safety**: Better TypeScript types with proper inheritance and utility types
+- **Reordered context properties**: Context interface properties reordered for better logical grouping
+
+### Fixed
+
+- **Type safety**: Removed unsafe type casting in delegation validation
+- **Error consistency**: No more mixed error handling patterns (throw vs state)
+
+### Documentation
+
+- **Comprehensive README updates**: Added detailed login process documentation, status flow explanations, and troubleshooting guide
+- **Enhanced examples**: More complete code examples showing real-world usage patterns
+
 ## 0.3.1 - 2025-05-30
 
 ### Changed
