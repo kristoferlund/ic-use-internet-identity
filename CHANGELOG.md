@@ -5,8 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [0.4.0] - 2025-08-06
 
 ### ⚠️ Breaking Changes
@@ -32,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Upgraded dependencies**: Updated minimum required `@dfinity/*` packages from `>=2.4.1` to `>=3.1.0` ([828a57c](https://github.com/kristoferlund/ic-use-internet-identity/commit/828a57c8641b7c9578aeb17a6932000a9e2c520f))
+- **Upgraded dependencies**: Updated `@xstate/store` from `2.6.2` to `^3.8.5` ([e544b5b](https://github.com/kristoferlund/ic-use-internet-identity/commit/e544b5b))
 - **Improved error handling**: Consistent error handling pattern - all errors set via state instead of mixed throw/state approach ([9305299](https://github.com/kristoferlund/ic-use-internet-identity/commit/9305299057e5d53dd46142e4dfa65a55ef4cc62c))
 - **Simplified state management**: Reduced XState store boilerplate with generic `setState` action
 - **Enhanced type safety**: Better TypeScript types with proper inheritance and utility types
