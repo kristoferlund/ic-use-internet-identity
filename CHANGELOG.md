@@ -17,15 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `loginError` → `error`
   - `isLoginError` → `isError`
   - `isLoginIdle` → `isIdle`
-
+- **Status type expanded**: Added `"initializing"` to the `Status` type, and `isInitializing` is now a computed property (`status === "initializing"`) instead of a separate boolean
 - **Function signatures changed**:
   - `login()` now returns `void` instead of `Promise<void>`
   - `clear()` now returns `void` instead of `Promise<void>`
 - **LoginOptions interface**: Now extends `AuthClientLoginOptions` with `onSuccess`, `onError` omitted ([4f04748](https://github.com/kristoferlund/ic-use-internet-identity/commit/4f04748396db12004eefa9ea7de08edb270ce15c))
+- **Default identity provider**: Library now defaults to `https://identity.ic0.app` without requiring environment variable configuration. Custom identity provider can be set via `identityProvider` option on the `InternetIdentityProvider`. ([4f04748](https://github.com/kristoferlund/ic-use-internet-identity/commit/4f04748396db12004eefa9ea7de08edb270ce15c))
 
 ### Added
 
-- **Default identity provider**: Library now defaults to `https://identity.ic0.app` without requiring environment variable configuration ([4f04748](https://github.com/kristoferlund/ic-use-internet-identity/commit/4f04748396db12004eefa9ea7de08edb270ce15c))
 - **Extended LoginOptions**: All `AuthClientLoginOptions` properties are now available (except `onSuccess`, `onError`)
 - **Comprehensive error handling**: All errors now flow through state management instead of thrown exceptions
 
@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Simplified state management**: Reduced XState store boilerplate with generic `setState` action
 - **Enhanced type safety**: Better TypeScript types with proper inheritance and utility types
 - **Reordered context properties**: Context interface properties reordered for better logical grouping
+- **Unified status tracking**: Initial state is now `"initializing"` instead of `"idle"` with separate initialization flag
 
 ### Fixed
 
