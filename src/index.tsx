@@ -1,6 +1,5 @@
 import { createStore } from "@xstate/store";
 import { useSelector } from "@xstate/store/react";
-import type { LoginStatus } from "./state.type";
 import { type ReactNode, useEffect } from "react";
 import {
   AuthClient,
@@ -9,35 +8,39 @@ import {
 } from "@dfinity/auth-client";
 import type { LoginOptions } from "./login-options.type";
 import type { Identity } from "@dfinity/agent";
-import type { InternetIdentityContextType } from "./context.type";
+import type { InternetIdentityContext, Status } from "./context.type";
 import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
-interface Context {
+const ONE_HOUR_IN_NANOSECONDS = BigInt(3_600_000_000_000);
+
+export interface StoreContext {
   providerComponentPresent: boolean;
   authClient?: AuthClient;
   createOptions?: AuthClientCreateOptions;
   loginOptions?: LoginOptions;
   isInitializing: boolean;
-  loginStatus: LoginStatus;
-  loginError?: Error;
+  status: Status;
+  error?: Error;
   identity?: Identity;
 }
 
-const initialContext: Context = {
+type StoreEvent = { type: "setState" } & Partial<StoreContext>;
+
+const initialContext: StoreContext = {
   providerComponentPresent: false,
   authClient: undefined,
   createOptions: undefined,
   loginOptions: undefined,
   isInitializing: false,
-  loginStatus: "idle",
-  loginError: undefined,
+  status: "idle",
+  error: undefined,
   identity: undefined,
 };
 
 const store = createStore({
   context: initialContext,
   on: {
-    setState: (context, event: Partial<Context>) => ({
+    setState: (context, event: StoreEvent) => ({
       ...context,
       ...event,
     }),
@@ -64,36 +67,37 @@ async function createAuthClient(): Promise<AuthClient> {
 }
 
 /**
- * Helper function to set login error state and return resolved promise.
+ * Helper function to set error state.
  */
-function setLoginErrorAndReturn(errorMessage: string): Promise<void> {
+function setError(errorMessage: string) {
   store.send({
     type: "setState",
-    loginStatus: "error" as LoginStatus,
-    loginError: new Error(errorMessage),
+    status: "error" as const,
+    error: new Error(errorMessage),
   });
-  return Promise.resolve();
 }
 
 /**
  * Connect to Internet Identity to login the user.
  */
-function login() {
+function login(): void {
   const context = store.getSnapshot().context;
 
   if (!context.providerComponentPresent) {
-    return setLoginErrorAndReturn(
+    setError(
       "The InternetIdentityProvider component is not present. Make sure to wrap your app with it.",
     );
+    return;
   }
 
   const authClient = context.authClient;
   if (!authClient) {
     // AuthClient should have a value at this point, unless `login` was called immediately with e.g. useEffect,
     // doing so would be incorrect since a browser popup window can only be reliably opened on user interaction.
-    return setLoginErrorAndReturn(
+    setError(
       "AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.",
     );
+    return;
   }
 
   const identity = authClient.getIdentity();
@@ -101,86 +105,103 @@ function login() {
     // We avoid using `authClient.isAuthenticated` since that's async and would potentially block the popup window,
     // instead we work around this by checking the principal and delegation validity, which gives us the same info.
     !identity.getPrincipal().isAnonymous() &&
-    isDelegationValid((identity as DelegationIdentity).getDelegation())
+    identity instanceof DelegationIdentity &&
+    isDelegationValid(identity.getDelegation())
   ) {
-    return setLoginErrorAndReturn("User is already authenticated");
+    setError("User is already authenticated");
+    return;
   }
 
   const loginOptions = context.loginOptions;
+
+  if (!process.env.II_URL) {
+    setError("Internet Identity URL is not configured");
+    return;
+  }
+
   const options: AuthClientLoginOptions = {
     identityProvider: process.env.II_URL,
     onSuccess: onLoginSuccess,
     onError: onLoginError,
-    maxTimeToLive: BigInt(3_600_000_000_000), // Defaults to 1 hour
+    maxTimeToLive: ONE_HOUR_IN_NANOSECONDS,
     ...loginOptions,
   };
 
-  store.send({ type: "setState", loginStatus: "logging-in" as LoginStatus });
-  return authClient.login(options);
+  store.send({ type: "setState", status: "logging-in" as const });
+  void authClient.login(options);
+  return;
 }
 
 /**
  * Callback, login was successful. Saves identity to state.
  */
-function onLoginSuccess() {
+function onLoginSuccess(): void {
   const identity = store.getSnapshot().context.authClient?.getIdentity();
   if (!identity) {
-    throw new Error("Identity not found after successful login");
+    setError("Identity not found after successful login");
+    return;
   }
   store.send({
     type: "setState",
     identity,
-    loginStatus: "success" as LoginStatus,
+    status: "success" as const,
   });
 }
 
 /**
  * Login was not successful. Sets loginError.
  */
-function onLoginError(error?: string) {
-  store.send({
-    type: "setState",
-    loginStatus: "error" as LoginStatus,
-    loginError: new Error(error),
-  });
+function onLoginError(error?: string): void {
+  setError(error ?? "Login failed");
 }
 
 /**
  * Clears the identity from the state and local storage. Effectively "logs the
  * user out".
  */
-async function clear() {
+function clear(): void {
   const authClient = store.getSnapshot().context.authClient;
   if (!authClient) {
-    throw new Error("Auth client not initialized");
+    setError("Auth client not initialized");
+    return;
   }
-  await authClient.logout();
 
-  store.send({
-    type: "setState",
-    identity: undefined,
-    loginStatus: "idle" as LoginStatus,
-    loginError: undefined,
-  });
+  void authClient
+    .logout()
+    .then(() => {
+      store.send({
+        type: "setState",
+        identity: undefined,
+        status: "idle" as const,
+        error: undefined,
+      });
+    })
+    .catch((error: unknown) => {
+      store.send({
+        type: "setState",
+        status: "error" as const,
+        error: error instanceof Error ? error : new Error("Logout failed"),
+      });
+    });
 }
 
 /**
  * Hook to access the internet identity as well as login status along with
  * login and clear functions.
  */
-export const useInternetIdentity = (): InternetIdentityContextType => {
+export const useInternetIdentity = (): InternetIdentityContext => {
   const context = useSelector(store, (state) => state.context);
   return {
-    isInitializing: context.isInitializing,
-    login,
-    loginStatus: context.loginStatus,
-    loginError: context.loginError,
-    isLoggingIn: context.loginStatus === "logging-in",
-    isLoginError: context.loginStatus === "error",
-    isLoginSuccess: context.loginStatus === "success",
-    isLoginIdle: context.loginStatus === "idle",
-    clear,
     identity: context.identity,
+    login,
+    clear,
+    status: context.status,
+    isInitializing: context.isInitializing,
+    isIdle: context.status === "idle",
+    isLoggingIn: context.status === "logging-in",
+    isLoginSuccess: context.status === "success",
+    isError: context.status === "error",
+    error: context.error,
   };
 };
 
@@ -222,21 +243,31 @@ export function InternetIdentityProvider({
   // Effect runs on mount. Creates an AuthClient and attempts to load a saved identity.
   useEffect(() => {
     void (async () => {
-      store.send({
-        type: "setState",
-        providerComponentPresent: true,
-        isInitializing: true,
-        createOptions,
-        loginOptions,
-      });
-      let authClient = store.getSnapshot().context.authClient;
-      authClient ??= await createAuthClient();
-      const isAuthenticated = await authClient.isAuthenticated();
-      if (isAuthenticated) {
-        const identity = authClient.getIdentity();
-        store.send({ type: "setState", identity });
+      try {
+        store.send({
+          type: "setState",
+          providerComponentPresent: true,
+          isInitializing: true,
+          createOptions,
+          loginOptions,
+        });
+        let authClient = store.getSnapshot().context.authClient;
+        authClient ??= await createAuthClient();
+        const isAuthenticated = await authClient.isAuthenticated();
+        if (isAuthenticated) {
+          const identity = authClient.getIdentity();
+          store.send({ type: "setState", identity });
+        }
+      } catch (error) {
+        store.send({
+          type: "setState",
+          status: "error" as const,
+          error:
+            error instanceof Error ? error : new Error("Initialization failed"),
+        });
+      } finally {
+        store.send({ type: "setState", isInitializing: false });
       }
-      store.send({ type: "setState", isInitializing: false });
     })();
   }, [createOptions, loginOptions]);
 

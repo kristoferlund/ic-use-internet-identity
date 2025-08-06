@@ -103,12 +103,33 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
 ### 2. Connect the `login()` function to a button
 
-Calling `login()` opens up the Internet Identity service in a new popup window where the user is asked to sign in. Once signed in, the window closes and the identity is stored in local storage. The identity is then available in the `identity` context variable.
+The `login()` function initiates the Internet Identity authentication process. Here's what happens when you call it:
+
+1. **Pre-flight Validation**: The function first validates that all prerequisites are met (provider is present, auth client is initialized, user isn't already authenticated)
+2. **Popup Window**: If validation passes, it opens the Internet Identity service in a new popup window
+3. **Status Updates**: The `status` immediately changes to `"logging-in"` and remains there until the process completes
+4. **User Authentication**: The user completes authentication in the popup window
+5. **Result Handling**:
+   - **Success**: `status` becomes `"success"`, `identity` is populated, and the popup closes
+   - **Error**: `status` becomes `"error"` and `error` contains the error details
+   - **User Cancellation**: Treated as an error with appropriate error message
 
 > [!WARNING]
 > **User Interaction Required**: The `login()` function MUST be called in response to a user interaction (e.g., button click). Calling it in `useEffect` or similar will fail because browsers block popup windows that aren't triggered by user actions.
 
-Use the `loginStatus` and `loginError` state variables to track the status of the login process. All errors are handled through the hook's state - no need for try/catch blocks.
+> [!IMPORTANT]
+> **No Promise Handling Required**: The `login()` function returns `void` and handles all results through the hook's state. Monitor the `status`, `error`, and `identity` values returned by the hook instead of using try/catch blocks.
+
+#### Monitoring the Login Process
+
+The login process follows a predictable status flow:
+
+- **`"idle"`** → Initial state, ready to login
+- **`"logging-in"`** → Login popup is open, user is authenticating
+- **`"success"`** → Login completed successfully, `identity` is available
+- **`"error"`** → Login failed, check `error` for details
+
+Use the `status` and `error` state variables to track the login process and provide appropriate UI feedback:
 
 ```jsx
 // LoginButton.tsx
@@ -116,23 +137,71 @@ Use the `loginStatus` and `loginError` state variables to track the status of th
 import { useInternetIdentity } from "ic-use-internet-identity";
 
 export function LoginButton() {
-  const { login, loginStatus, loginError, isLoginError } = useInternetIdentity();
+  const { login, status, error, isError, identity } = useInternetIdentity();
 
-  const disabled = loginStatus === "logging-in" || loginStatus === "success";
-  const text = loginStatus === "logging-in" ? "Logging in..." : "Login";
+  const renderButton = () => {
+    switch (status) {
+      case "idle":
+        return (
+          <button onClick={login}>
+            Login with Internet Identity
+          </button>
+        );
+      case "logging-in":
+        return (
+          <button disabled>
+            🔄 Logging in...
+          </button>
+        );
+      case "success":
+        return (
+          <button disabled>
+            ✅ Logged in as {identity?.getPrincipal().toString().slice(0, 8)}...
+          </button>
+        );
+      case "error":
+        return (
+          <button onClick={login}>
+            🔄 Retry Login
+          </button>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div>
-      <button onClick={login} disabled={disabled}>
-        {text}
-      </button>
-      {isLoginError && (
-        <div style={{ color: "red" }}>
-          Login failed: {loginError?.message}
+      {renderButton()}
+      {isError && (
+        <div style={{ color: "red", marginTop: "8px" }}>
+          ❌ Login failed: {error?.message}
         </div>
       )}
     </div>
   );
+}
+```
+
+#### Status Helper Properties
+
+The hook also provides convenient boolean properties for common status checks:
+
+```jsx
+const {
+  isIdle,        // status === "idle"
+  isLoggingIn,   // status === "logging-in"
+  isLoginSuccess, // status === "success"
+  isError        // status === "error"
+} = useInternetIdentity();
+
+// Example usage
+if (isLoggingIn) {
+  // Show loading spinner
+}
+
+if (isLoginSuccess && identity) {
+  // User is authenticated, show protected content
 }
 ```
 
@@ -240,69 +309,67 @@ export type LoginOptions = {
 ## useInternetIdentity interface
 
 ```ts
-export type InternetIdentityContextType = {
+export type Status = "error" | "logging-in" | "success" | "idle";
+
+export type InternetIdentityContext = {
+  /** The identity is available after successfully loading the identity from local storage
+   * or completing the login process. */
+  identity?: Identity;
+
+  /** Connect to Internet Identity to login the user. */
+  login: () => void;
+
+  /** Clears the identity from the state and local storage. Effectively "logs the user out". */
+  clear: () => void;
+
+  /** The status of the login process. Note: The login status is not affected when a stored
+   * identity is loaded on mount. */
+  status: Status;
+
   /** Is set to `true` on mount until a stored identity is loaded from local storage or
    * none is found. */
   isInitializing: boolean;
 
-  /** Connect to Internet Identity to login the user. */
-  login: () => Promise<void>;
+  /** `status === "idle"` */
+  isIdle: boolean;
 
-  /** The status of the login process. Note: The login status is not affected when a stored
-   * identity is loaded on mount. */
-  loginStatus: LoginStatus;
-
-  /** `loginStatus === "logging-in"` */
+  /** `status === "logging-in"` */
   isLoggingIn: boolean;
 
-  /** `loginStatus === "error"` */
-  isLoginError: boolean;
-
-  /** `loginStatus === "success"` */
+  /** `status === "success"` */
   isLoginSuccess: boolean;
 
-  /** `loginStatus === "idle"` */
-  isLoginIdle: boolean;
+  /** `status === "error"` */
+  isError: boolean;
 
   /** Login error. Unsurprisingly. */
-  loginError?: Error;
-
-  /** Clears the identity from the state and local storage. Effectively "logs the user out". */
-  clear: () => Promise<void>;
-
-  /** The identity is available after successfully loading the identity from local storage
-   * or completing the login process. */
-  identity?: Identity;
+  error?: Error;
 };
 ```
 
 ## Error Handling
 
-The library handles all errors through its state management system. You don't need try/catch blocks - simply monitor the `loginError` and `isLoginError` state:
+The library handles all errors through its state management system. You don't need try/catch blocks - simply monitor the `error` and `isError` state:
 
 ```tsx
 import { useInternetIdentity } from "ic-use-internet-identity";
 
 export function LoginComponent() {
-  const { login, loginError, isLoginError } = useInternetIdentity();
-
-  const handleLogin = async () => {
-    try {
-      await login();
-    } catch (error) {
-      // Possible errors:
-      // - "The InternetIdentityProvider component is not present"
-      // - "AuthClient is not initialized yet, make sure to call `login` on user interaction"
-      // - "User is already authenticated"
-      console.error("Login failed:", error);
-    }
-  };
+  const { login, error, isError, status } = useInternetIdentity();
 
   return (
     <div>
-      <button onClick={handleLogin}>Login</button>
-      {isLoginError && (
-        <div>Login error: {loginError?.message}</div>
+      <button
+        onClick={login}
+        disabled={status === "logging-in"}
+      >
+        {status === "logging-in" ? "Logging in..." : "Login"}
+      </button>
+
+      {isError && (
+        <div style={{ color: "red" }}>
+          Login error: {error?.message}
+        </div>
       )}
     </div>
   );
