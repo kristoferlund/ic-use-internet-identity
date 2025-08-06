@@ -10,7 +10,7 @@
 ## Features
 
 - **Cached Identity**: The identity is cached in local storage and restored on page load. This allows the user to stay logged in even if the page is refreshed.
-- **Login progress**: State varibles are provided to indicate whether the user is logged in, logging in, or logged out.
+- **Login progress**: State variables are provided to indicate whether the user is logged in, logging in, or logged out.
 - **Works with ic-use-actor**: Plays nicely with [ic-use-actor](https://www.npmjs.com/package/ic-use-actor) that provides easy access to canister methods.
 
 ## Table of Contents
@@ -20,11 +20,18 @@
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
   - [Usage](#usage)
+    - [Prerequisites](#prerequisites)
     - [1. Setup the `InternetIdentityProvider` component](#1-setup-the-internetidentityprovider-component)
     - [2. Connect the `login()` function to a button](#2-connect-the-login-function-to-a-button)
     - [3. Use the `identity` context variable to access the identity](#3-use-the-identity-context-variable-to-access-the-identity)
   - [InternetIdentityProvider props](#internetidentityprovider-props)
+  - [LoginOptions](#loginoptions)
   - [useInternetIdentity interface](#useinternetidentity-interface)
+  - [Error Handling](#error-handling)
+  - [Security Considerations](#security-considerations)
+  - [Troubleshooting](#troubleshooting)
+  - [Updates](#updates)
+  - [Author](#author)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -34,7 +41,7 @@
 pnpm install ic-use-internet-identity
 ```
 
-The hook also requires the following `@dfinity/x` packages to be installed with a version of at least `2.4.1`:
+The hook also requires the following `@dfinity/x` packages to be installed with a version of at least `3.1.0`:
 
 ```bash
 pnpm install @dfinity/agent @dfinity/auth-client @dfinity/identity @dfinity/candid
@@ -67,34 +74,56 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 ```
 
-> [!TIP] > `InternetIdentityProvider` defaults to using the main Internet Identity instance running on `https://identity.ic0.app`. If you want to use a local instance of the Internet Identity, override the `II_URL` environment variable with the URL of the local instance.
+> [!TIP]
+> **Identity Provider Configuration**: The library defaults to using the main Internet Identity instance at `https://identity.ic0.app`. You can override this by setting the `identityProvider` in your `loginOptions`.
 >
-> Example for Vite, using the [vite-plugin-environment](https://www.npmjs.com/package/vite-plugin-environment) plugin:
+> - **Default**: `https://identity.ic0.app` (used automatically)
+> - **Custom via loginOptions**: Pass `identityProvider` in `loginOptions` prop
+> - **Local development**: `http://${CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
 >
-> ```javascript
-> // vite.config.js
-> import environment from "vite-plugin-environment";
->
-> process.env.II_URL =
->   process.env.DFX_NETWORK === "local"
->     ? `http://${process.env.CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
->     : `https://identity.ic0.app`;
->
-> export default defineConfig({
->   // ...
->   plugins: [
->     // ...
->     environment(["II_URL"]),
->   ],
->   // ...
-> });
+> **Configure via loginOptions**
+> ```tsx
+> <InternetIdentityProvider
+>   loginOptions={{
+>     identityProvider: process.env.DFX_NETWORK === "local"
+>       ? `http://${process.env.CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
+>       : "https://identity.ic0.app"
+>   }}
+> >
+>   <App />
+> </InternetIdentityProvider>
 > ```
 
 ### 2. Connect the `login()` function to a button
 
-Calling `login()` opens up the Internet Identity service in a new window where the user is asked to sign in. Once signed in, the window closes and the identity is stored in local storage. The identity is then available in the `identity` context variable.
+The `login()` function initiates the Internet Identity authentication process. Here's what happens when you call it:
 
-Use the `loginStatus` state variable to track the status of the login process. The `loginStatus` can be one of the following values: `idle`, `logging-in`, `success`, or `error`.
+1. **Pre-flight Validation**: The function first validates that all prerequisites are met (provider is present, auth client is initialized, user isn't already authenticated)
+2. **Popup Window**: If validation passes, it opens the Internet Identity service in a new popup window
+3. **Status Updates**: The `status` immediately changes to `"logging-in"` and remains there until the process completes
+4. **User Authentication**: The user completes authentication in the popup window
+5. **Result Handling**:
+   - **Success**: `status` becomes `"success"`, `identity` is populated, and the popup closes
+   - **Error**: `status` becomes `"error"` and `error` contains the error details
+   - **User Cancellation**: Treated as an error with appropriate error message
+
+> [!WARNING]
+> **User Interaction Required**: The `login()` function MUST be called in response to a user interaction (e.g., button click). Calling it in `useEffect` or similar will fail because browsers block popup windows that aren't triggered by user actions.
+
+> [!IMPORTANT]
+> **No Promise Handling Required**: The `login()` function returns `void` and handles all results through the hook's state. Monitor the `status`, `error`, and `identity` values returned by the hook instead of using try/catch blocks.
+
+#### Monitoring the Login Process
+
+The login process follows a predictable status flow:
+
+- **`"initializing"`** → Library is loading and checking for existing authentication
+- **`"idle"`** → Ready to login
+- **`"logging-in"`** → Login popup is open, user is authenticating
+- **`"success"`** → Login completed successfully, `identity` is available
+- **`"error"`** → Login failed, check `error` for details
+
+Use the `status` and `error` state variables to track the login process and provide appropriate UI feedback:
 
 ```jsx
 // LoginButton.tsx
@@ -102,16 +131,82 @@ Use the `loginStatus` state variable to track the status of the login process. T
 import { useInternetIdentity } from "ic-use-internet-identity";
 
 export function LoginButton() {
-  const { login, loginStatus } = useInternetIdentity();
+  const { login, status, error, isError, identity } = useInternetIdentity();
 
-  const disabled = loginStatus === "logging-in" || loginStatus === "success";
-  const text = loginStatus === "logging-in" ? "Logging in..." : "Login";
+  const renderButton = () => {
+    switch (status) {
+      case "initializing":
+        return (
+          <button disabled>
+            ⏳ Initializing...
+          </button>
+        );
+      case "idle":
+        return (
+          <button onClick={login}>
+            Login with Internet Identity
+          </button>
+        );
+      case "logging-in":
+        return (
+          <button disabled>
+            🔄 Logging in...
+          </button>
+        );
+      case "success":
+        return (
+          <button disabled>
+            ✅ Logged in as {identity?.getPrincipal().toString().slice(0, 8)}...
+          </button>
+        );
+      case "error":
+        return (
+          <button onClick={login}>
+            🔄 Retry Login
+          </button>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
-    <button onClick={login} disabled={disabled}>
-      {text}
-    </button>
+    <div>
+      {renderButton()}
+      {isError && (
+        <div style={{ color: "red", marginTop: "8px" }}>
+          ❌ Login failed: {error?.message}
+        </div>
+      )}
+    </div>
   );
+}
+```
+
+#### Status Helper Properties
+
+The hook also provides convenient boolean properties for common status checks:
+
+```jsx
+const {
+  isInitializing, // status === "initializing"
+  isIdle,        // status === "idle"
+  isLoggingIn,   // status === "logging-in"
+  isLoginSuccess, // status === "success"
+  isError        // status === "error"
+} = useInternetIdentity();
+
+// Example usage
+if (isInitializing) {
+  // Show initial loading state
+}
+
+if (isLoggingIn) {
+  // Show login spinner
+}
+
+if (isLoginSuccess && identity) {
+  // User is authenticated, show protected content
 }
 ```
 
@@ -188,72 +283,112 @@ export const useActor = createUseActorHook<_SERVICE>(actorContext);
 
 ## LoginOptions
 
+The `LoginOptions` interface extends `AuthClientLoginOptions` from `@dfinity/auth-client` with some modifications:
+
 ```ts
-export type LoginOptions = {
+import type { AuthClientLoginOptions } from "@dfinity/auth-client";
+
+export interface LoginOptions
+  extends Omit<
+    AuthClientLoginOptions,
+    "onSuccess" | "onError" | "maxTimeToLive"
+  > {
   /**
    * Expiration of the authentication in nanoseconds
-   * @default  BigInt(8) hours * BigInt(3_600_000_000_000) nanoseconds
+   * @default BigInt(3_600_000_000_000) nanoseconds (1 hour)
    */
   maxTimeToLive?: bigint;
-  /**
-   * If present, indicates whether or not the Identity Provider should allow the user to authenticate and/or register using a temporary key/PIN identity. Authenticating dapps may want to prevent users from using Temporary keys/PIN identities because Temporary keys/PIN identities are less secure than Passkeys (webauthn credentials) and because Temporary keys/PIN identities generally only live in a browser database (which may get cleared by the browser/OS).
-   */
-  allowPinAuthentication?: boolean;
-  /**
-   * Origin for Identity Provider to use while generating the delegated identity. For II, the derivation origin must authorize this origin by setting a record at `<derivation-origin>/.well-known/ii-alternative-origins`.
-   * @see https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc
-   */
-  derivationOrigin?: string | URL;
-  /**
-   * Auth Window feature config string
-   * @example "toolbar=0,location=0,menubar=0,width=500,height=500,left=100,top=100"
-   */
-  windowOpenerFeatures?: string;
-  /**
-   * Extra values to be passed in the login request during the authorize-ready phase
-   */
-  customValues?: Record<string, unknown>;
-};
+}
 ```
+
+This means you can use all properties from `AuthClientLoginOptions` except `onSuccess`, `onError`. Available properties include:
+
+- **`identityProvider?: string | URL`** - Identity provider URL (defaults to `https://identity.ic0.app`)
+- **`maxTimeToLive?: bigint`** - Session expiration (defaults to 1 hour)
+- **`allowPinAuthentication?: boolean`** - Allow PIN/temporary key authentication
+- **`derivationOrigin?: string | URL`** - Origin for delegated identity generation
+- **`windowOpenerFeatures?: string`** - Popup window configuration
+- **`customValues?: Record<string, unknown>`** - Extra values for login request
 
 ## useInternetIdentity interface
 
 ```ts
-export type InternetIdentityContextType = {
-  /** Is set to `true` on mount until a stored identity is loaded from local storage or
-   * none is found. */
-  isInitializing: boolean;
+export type Status =
+  | "initializing"
+  | "idle"
+  | "logging-in"
+  | "success"
+  | "error";
 
-  /** Connect to Internet Identity to login the user. */
-  login: () => Promise<void>;
-
-  /** The status of the login process. Note: The login status is not affected when a stored
-   * identity is loaded on mount. */
-  loginStatus: LoginStatus;
-
-  /** `loginStatus === "logging-in"` */
-  isLoggingIn: boolean;
-
-  /** `loginStatus === "error"` */
-  isLoginError: boolean;
-
-  /** `loginStatus === "success"` */
-  isLoginSuccess: boolean;
-
-  /** `loginStatus === "idle"` */
-  isLoginIdle: boolean;
-
-  /** Login error. Unsurprisingly. */
-  loginError?: Error;
-
-  /** Clears the identity from the state and local storage. Effectively "logs the user out". */
-  clear: () => Promise<void>;
-
+export type InternetIdentityContext = {
   /** The identity is available after successfully loading the identity from local storage
    * or completing the login process. */
   identity?: Identity;
+
+  /** Connect to Internet Identity to login the user. */
+  login: () => void;
+
+  /** Clears the identity from the state and local storage. Effectively "logs the user out". */
+  clear: () => void;
+
+  /** The status of the login process. Note: The login status is not affected when a stored
+   * identity is loaded on mount. */
+  status: Status;
+
+  /** `status === "initializing"` */
+  isInitializing: boolean;
+
+  /** `status === "idle"` */
+  isIdle: boolean;
+
+  /** `status === "logging-in"` */
+  isLoggingIn: boolean;
+
+  /** `status === "success"` */
+  isLoginSuccess: boolean;
+
+  /** `status === "error"` */
+  isError: boolean;
+
+  /** Login error. Unsurprisingly. */
+  error?: Error;
 };
 ```
+
+## Error Handling
+
+The library handles all errors through its state management system. You don't need try/catch blocks - simply monitor the `error` and `isError` state:
+
+```tsx
+import { useInternetIdentity } from "ic-use-internet-identity";
+
+export function LoginComponent() {
+  const { login, error, isError, status } = useInternetIdentity();
+
+  return (
+    <div>
+      <button
+        onClick={login}
+        disabled={status === "logging-in"}
+      >
+        {status === "logging-in" ? "Logging in..." : "Login"}
+      </button>
+
+      {isError && (
+        <div style={{ color: "red" }}>
+          Login error: {error?.message}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Security Considerations
+
+- **Delegation Expiry**: By default, delegations expire after 1 hour. Monitor `identity` for changes and handle re-authentication.
+- **Secure Storage**: Identities are stored in browser local storage. Consider the security implications for your use case.
+- **Session Management**: The library disables automatic logout on idle by default. Consider your app's security requirements.
 
 ## Updates
 
@@ -277,7 +412,5 @@ This project is licensed under the MIT License. See the LICENSE file for more de
 [version-image]: https://img.shields.io/npm/v/ic-use-internet-identity
 [dl-image]: https://img.shields.io/npm/dw/ic-use-internet-identity
 [npm-link]: https://www.npmjs.com/package/ic-use-internet-identity
-
-```
 
 ```

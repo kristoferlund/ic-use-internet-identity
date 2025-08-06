@@ -1,6 +1,5 @@
 import { createStore } from "@xstate/store";
 import { useSelector } from "@xstate/store/react";
-import type { LoginStatus } from "./state.type";
 import { type ReactNode, useEffect } from "react";
 import {
   AuthClient,
@@ -9,65 +8,41 @@ import {
 } from "@dfinity/auth-client";
 import type { LoginOptions } from "./login-options.type";
 import type { Identity } from "@dfinity/agent";
-import type { InternetIdentityContextType } from "./context.type";
+import type { InternetIdentityContext, Status } from "./context.type";
 import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
-interface Context {
+const ONE_HOUR_IN_NANOSECONDS = BigInt(3_600_000_000_000);
+const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
+
+export interface StoreContext {
   providerComponentPresent: boolean;
   authClient?: AuthClient;
   createOptions?: AuthClientCreateOptions;
   loginOptions?: LoginOptions;
-  isInitializing: boolean;
-  loginStatus: LoginStatus;
-  loginError?: Error;
+  status: Status;
+  error?: Error;
   identity?: Identity;
 }
 
-const initialContext: Context = {
+type StoreEvent = { type: "setState" } & Partial<StoreContext>;
+
+const initialContext: StoreContext = {
   providerComponentPresent: false,
   authClient: undefined,
   createOptions: undefined,
   loginOptions: undefined,
-  isInitializing: false,
-  loginStatus: "idle",
-  loginError: undefined,
+  status: "initializing",
+  error: undefined,
   identity: undefined,
 };
 
 const store = createStore({
   context: initialContext,
   on: {
-    setProviderComponentPresent: {
-      providerComponentPresent: (
-        _,
-        event: { providerComponentPresent: boolean },
-      ) => event.providerComponentPresent,
-    },
-    setAuthClient: {
-      authClient: (_, event: { authClient?: AuthClient }) => event.authClient,
-    },
-    setCreateOptions: {
-      createOptions: (_, event: { createOptions?: AuthClientCreateOptions }) =>
-        event.createOptions,
-    },
-    setLoginOptions: {
-      loginOptions: (_, event: { loginOptions?: LoginOptions }) =>
-        event.loginOptions,
-    },
-    setIsInitializing: {
-      isInitializing: (_, event: { isInitializing: boolean }) =>
-        event.isInitializing,
-    },
-    setLoginStatus: {
-      loginStatus: (_, event: { loginStatus: LoginStatus }) =>
-        event.loginStatus,
-    },
-    setIdentity: {
-      identity: (_, event: { identity?: Identity }) => event.identity,
-    },
-    setLoginError: {
-      loginError: (_, event: { loginError?: Error }) => event.loginError,
-    },
+    setState: (context, event: StoreEvent) => ({
+      ...context,
+      ...event,
+    }),
   },
 });
 
@@ -78,7 +53,7 @@ async function createAuthClient(): Promise<AuthClient> {
   const createOptions = store.getSnapshot().context.createOptions;
   const options: AuthClientCreateOptions = {
     idleOptions: {
-      // Default behaviour of this hook is not to logout and reload window on indentity expiration
+      // Default behaviour of this hook is not to logout and reload window on identity expiration
       disableDefaultIdleCallback: true,
       disableIdle: true,
       ...createOptions?.idleOptions,
@@ -86,109 +61,149 @@ async function createAuthClient(): Promise<AuthClient> {
     ...createOptions,
   };
   const authClient = await AuthClient.create(options);
-  store.send({ type: "setAuthClient", authClient });
+  store.send({ type: "setState", authClient });
   return authClient;
 }
 
 /**
- * Connect to Internet Identity to login the user.
+ * Helper function to set error state.
  */
-function login() {
+function setError(errorMessage: string) {
+  store.send({
+    type: "setState",
+    status: "error" as const,
+    error: new Error(errorMessage),
+  });
+}
+
+/**
+ * Connect to Internet Identity to login the user.
+ *
+ * This function initiates the Internet Identity authentication process by:
+ * 1. Validating prerequisites (provider present, auth client initialized, user not already authenticated)
+ * 2. Opening a popup window to the Identity Provider
+ * 3. Setting status to "logging-in" and handling the result through state management
+ *
+ * All results (success/error) are communicated through the hook's state - monitor `status`, `error`, and `identity`.
+ *
+ * @throws No exceptions - all errors are handled via state management
+ * @returns void - results available through hook state
+ */
+function login(): void {
   const context = store.getSnapshot().context;
 
   if (!context.providerComponentPresent) {
-    throw new Error(
+    setError(
       "The InternetIdentityProvider component is not present. Make sure to wrap your app with it.",
     );
+    return;
   }
 
   const authClient = context.authClient;
-
   if (!authClient) {
     // AuthClient should have a value at this point, unless `login` was called immediately with e.g. useEffect,
     // doing so would be incorrect since a browser popup window can only be reliably opened on user interaction.
-    throw new Error(
+    setError(
       "AuthClient is not initialized yet, make sure to call `login` on user interaction e.g. click.",
     );
+    return;
   }
 
   const identity = authClient.getIdentity();
-
-  // We avoid using `authClient.isAuthenticated` since that's async and would potentially block the popup window,
-  // instead we work around this by checking the principal and delegation validity, which gives us the same info.
   if (
+    // We avoid using `authClient.isAuthenticated` since that's async and would potentially block the popup window,
+    // instead we work around this by checking the principal and delegation validity, which gives us the same info.
     !identity.getPrincipal().isAnonymous() &&
-    isDelegationValid((identity as DelegationIdentity).getDelegation())
+    identity instanceof DelegationIdentity &&
+    isDelegationValid(identity.getDelegation())
   ) {
-    throw new Error("User is already authenticated");
+    setError("User is already authenticated");
+    return;
   }
 
-  const loginOptions = context.loginOptions;
   const options: AuthClientLoginOptions = {
-    identityProvider: process.env.II_URL,
+    identityProvider: DEFAULT_IDENTITY_PROVIDER,
     onSuccess: onLoginSuccess,
     onError: onLoginError,
-    maxTimeToLive: BigInt(3_600_000_000_000), // Defaults to 1 hour
-    ...loginOptions,
+    maxTimeToLive: ONE_HOUR_IN_NANOSECONDS,
+    ...context.loginOptions,
   };
 
-  store.send({ type: "setLoginStatus", loginStatus: "logging-in" });
-  return authClient.login(options);
+  store.send({ type: "setState", status: "logging-in" as const });
+  void authClient.login(options);
+  return;
 }
 
 /**
  * Callback, login was successful. Saves identity to state.
  */
-function onLoginSuccess() {
+function onLoginSuccess(): void {
   const identity = store.getSnapshot().context.authClient?.getIdentity();
   if (!identity) {
-    throw new Error("Identity not found after successful login");
+    setError("Identity not found after successful login");
+    return;
   }
-  store.send({ type: "setIdentity", identity });
-  store.send({ type: "setLoginStatus", loginStatus: "success" });
+  store.send({
+    type: "setState",
+    identity,
+    status: "success" as const,
+  });
 }
 
 /**
  * Login was not successful. Sets loginError.
  */
-function onLoginError(error?: string) {
-  store.send({ type: "setLoginStatus", loginStatus: "error" });
-  store.send({ type: "setLoginError", loginError: new Error(error) });
+function onLoginError(error?: string): void {
+  setError(error ?? "Login failed");
 }
 
 /**
  * Clears the identity from the state and local storage. Effectively "logs the
  * user out".
  */
-async function clear() {
+function clear(): void {
   const authClient = store.getSnapshot().context.authClient;
   if (!authClient) {
-    throw new Error("Auth client not initialized");
+    setError("Auth client not initialized");
+    return;
   }
-  await authClient.logout();
 
-  store.send({ type: "setIdentity", identity: undefined });
-  store.send({ type: "setLoginStatus", loginStatus: "idle" });
-  store.send({ type: "setLoginError", loginError: undefined });
+  void authClient
+    .logout()
+    .then(() => {
+      store.send({
+        type: "setState",
+        identity: undefined,
+        status: "idle" as const,
+        error: undefined,
+      });
+    })
+    .catch((error: unknown) => {
+      store.send({
+        type: "setState",
+        status: "error" as const,
+        error: error instanceof Error ? error : new Error("Logout failed"),
+      });
+    });
 }
 
 /**
  * Hook to access the internet identity as well as login status along with
  * login and clear functions.
  */
-export const useInternetIdentity = (): InternetIdentityContextType => {
+export const useInternetIdentity = (): InternetIdentityContext => {
   const context = useSelector(store, (state) => state.context);
   return {
-    isInitializing: context.isInitializing,
-    login,
-    loginStatus: context.loginStatus,
-    loginError: context.loginError,
-    isLoggingIn: context.loginStatus === "logging-in",
-    isLoginError: context.loginStatus === "error",
-    isLoginSuccess: context.loginStatus === "success",
-    isLoginIdle: context.loginStatus === "idle",
-    clear,
     identity: context.identity,
+    login,
+    clear,
+    status: context.status,
+    isInitializing: context.status === "initializing",
+    isIdle: context.status === "idle",
+    isLoggingIn: context.status === "logging-in",
+    isLoginSuccess: context.status === "success",
+    isError: context.status === "error",
+    error: context.error,
   };
 };
 
@@ -196,6 +211,23 @@ export const useInternetIdentity = (): InternetIdentityContextType => {
  * The InternetIdentityProvider component makes the saved identity available
  * after page reloads. It also allows you to configure default options
  * for AuthClient and login.
+ *
+ * By default, the component uses the main Internet Identity service at
+ * https://identity.ic0.app. For local development, you can override this
+ * by setting the identityProvider in loginOptions:
+ *
+ * @example
+ * ```tsx
+ * <InternetIdentityProvider
+ *   loginOptions={{
+ *     identityProvider: process.env.DFX_NETWORK === "local"
+ *       ? `http://${process.env.CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
+ *       : "https://identity.ic0.app"
+ *   }}
+ * >
+ *   <App />
+ * </InternetIdentityProvider>
+ * ```
  */
 export function InternetIdentityProvider({
   children,
@@ -230,21 +262,31 @@ export function InternetIdentityProvider({
   // Effect runs on mount. Creates an AuthClient and attempts to load a saved identity.
   useEffect(() => {
     void (async () => {
-      store.send({
-        type: "setProviderComponentPresent",
-        providerComponentPresent: true,
-      });
-      store.send({ type: "setIsInitializing", isInitializing: true });
-      store.send({ type: "setCreateOptions", createOptions });
-      store.send({ type: "setLoginOptions", loginOptions });
-      let authClient = store.getSnapshot().context.authClient;
-      authClient ??= await createAuthClient();
-      const isAuthenticated = await authClient.isAuthenticated();
-      if (isAuthenticated) {
-        const identity = authClient.getIdentity();
-        store.send({ type: "setIdentity", identity });
+      try {
+        store.send({
+          type: "setState",
+          providerComponentPresent: true,
+          status: "initializing" as const,
+          createOptions,
+          loginOptions,
+        });
+        let authClient = store.getSnapshot().context.authClient;
+        authClient ??= await createAuthClient();
+        const isAuthenticated = await authClient.isAuthenticated();
+        if (isAuthenticated) {
+          const identity = authClient.getIdentity();
+          store.send({ type: "setState", identity });
+        }
+      } catch (error) {
+        store.send({
+          type: "setState",
+          status: "error" as const,
+          error:
+            error instanceof Error ? error : new Error("Initialization failed"),
+        });
+      } finally {
+        store.send({ type: "setState", status: "idle" as const });
       }
-      store.send({ type: "setIsInitializing", isInitializing: false });
     })();
   }, [createOptions, loginOptions]);
 
