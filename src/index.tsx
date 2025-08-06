@@ -12,6 +12,7 @@ import type { InternetIdentityContext, Status } from "./context.type";
 import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
 const ONE_HOUR_IN_NANOSECONDS = BigInt(3_600_000_000_000);
+const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
 
 export interface StoreContext {
   providerComponentPresent: boolean;
@@ -112,19 +113,12 @@ function login(): void {
     return;
   }
 
-  const loginOptions = context.loginOptions;
-
-  if (!process.env.II_URL) {
-    setError("Internet Identity URL is not configured");
-    return;
-  }
-
   const options: AuthClientLoginOptions = {
-    identityProvider: process.env.II_URL,
+    identityProvider: DEFAULT_IDENTITY_PROVIDER,
     onSuccess: onLoginSuccess,
     onError: onLoginError,
     maxTimeToLive: ONE_HOUR_IN_NANOSECONDS,
-    ...loginOptions,
+    ...context.loginOptions,
   };
 
   store.send({ type: "setState", status: "logging-in" as const });

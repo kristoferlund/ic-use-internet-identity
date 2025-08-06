@@ -74,31 +74,24 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 ```
 
-> [!IMPORTANT]
-> **Required Environment Variable**: You MUST set the `II_URL` environment variable or the login will fail. The library does not provide a default fallback.
+> [!TIP]
+> **Identity Provider Configuration**: The library defaults to using the main Internet Identity instance at `https://identity.ic0.app`. You can override this by setting the `identityProvider` in your `loginOptions`.
 >
-> - Production: `https://identity.ic0.app`
-> - Local development: `http://${CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
+> - **Default**: `https://identity.ic0.app` (used automatically)
+> - **Custom via loginOptions**: Pass `identityProvider` in `loginOptions` prop
+> - **Local development**: `http://${CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
 >
-> Example for Vite, using the [vite-plugin-environment](https://www.npmjs.com/package/vite-plugin-environment) plugin:
->
-> ```javascript
-> // vite.config.js
-> import environment from "vite-plugin-environment";
->
-> process.env.II_URL =
->   process.env.DFX_NETWORK === "local"
->     ? `http://${process.env.CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
->     : `https://identity.ic0.app`;
->
-> export default defineConfig({
->   // ...
->   plugins: [
->     // ...
->     environment(["II_URL"]),
->   ],
->   // ...
-> });
+> **Configure via loginOptions**
+> ```tsx
+> <InternetIdentityProvider
+>   loginOptions={{
+>     identityProvider: process.env.DFX_NETWORK === "local"
+>       ? `http://${process.env.CANISTER_ID_INTERNET_IDENTITY}.localhost:4943`
+>       : "https://identity.ic0.app"
+>   }}
+> >
+>   <App />
+> </InternetIdentityProvider>
 > ```
 
 ### 2. Connect the `login()` function to a button
@@ -278,33 +271,32 @@ export const useActor = createUseActorHook<_SERVICE>(actorContext);
 
 ## LoginOptions
 
+The `LoginOptions` interface extends `AuthClientLoginOptions` from `@dfinity/auth-client` with some modifications:
+
 ```ts
-export type LoginOptions = {
+import type { AuthClientLoginOptions } from "@dfinity/auth-client";
+
+export interface LoginOptions
+  extends Omit<
+    AuthClientLoginOptions,
+    "onSuccess" | "onError" | "maxTimeToLive"
+  > {
   /**
    * Expiration of the authentication in nanoseconds
-   * @default  BigInt(3_600_000_000_000) nanoseconds (1 hour)
+   * @default BigInt(3_600_000_000_000) nanoseconds (1 hour)
    */
   maxTimeToLive?: bigint;
-  /**
-   * If present, indicates whether or not the Identity Provider should allow the user to authenticate and/or register using a temporary key/PIN identity. Authenticating dapps may want to prevent users from using Temporary keys/PIN identities because Temporary keys/PIN identities are less secure than Passkeys (webauthn credentials) and because Temporary keys/PIN identities generally only live in a browser database (which may get cleared by the browser/OS).
-   */
-  allowPinAuthentication?: boolean;
-  /**
-   * Origin for Identity Provider to use while generating the delegated identity. For II, the derivation origin must authorize this origin by setting a record at `<derivation-origin>/.well-known/ii-alternative-origins`.
-   * @see https://github.com/dfinity/internet-identity/blob/main/docs/internet-identity-spec.adoc
-   */
-  derivationOrigin?: string | URL;
-  /**
-   * Auth Window feature config string
-   * @example "toolbar=0,location=0,menubar=0,width=500,height=500,left=100,top=100"
-   */
-  windowOpenerFeatures?: string;
-  /**
-   * Extra values to be passed in the login request during the authorize-ready phase
-   */
-  customValues?: Record<string, unknown>;
-};
+}
 ```
+
+This means you can use all properties from `AuthClientLoginOptions` except `onSuccess`, `onError`. Available properties include:
+
+- **`identityProvider?: string | URL`** - Identity provider URL (defaults to `https://identity.ic0.app`)
+- **`maxTimeToLive?: bigint`** - Session expiration (defaults to 1 hour)
+- **`allowPinAuthentication?: boolean`** - Allow PIN/temporary key authentication
+- **`derivationOrigin?: string | URL`** - Origin for delegated identity generation
+- **`windowOpenerFeatures?: string`** - Popup window configuration
+- **`customValues?: Record<string, unknown>`** - Extra values for login request
 
 ## useInternetIdentity interface
 
