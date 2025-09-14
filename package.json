@@ -1,6 +1,6 @@
 {
   "name": "ic-use-internet-identity",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Hook that makes it easy to integrate IC Internet Identity into your React application.",
   "author": "Kristofer Lund <kristofer@kristoferlund.se>",
   "repository": {
