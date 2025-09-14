@@ -48,11 +48,12 @@ const store = createStore({
 
 /**
  * Promise that resolves when the initialization is complete.
- * This allows external code (like TanStack Router) to await the initialization.
+ * It now resolves with an `Identity | undefined` so callers can
+ * both wait for initialization and obtain the restored identity.
  */
-let initializationResolve: (() => void) | null = null;
+let initializationResolve: ((identity?: Identity) => void) | null = null;
 let initializationReject: ((reason: Error) => void) | null = null;
-let initializationPromise: Promise<void> = new Promise<void>(
+let initializationPromise: Promise<Identity | undefined> = new Promise<Identity | undefined>(
   (resolve, reject) => {
     initializationResolve = resolve;
     initializationReject = reject;
@@ -60,17 +61,25 @@ let initializationPromise: Promise<void> = new Promise<void>(
 );
 
 /**
- * Await the initialization of the Internet Identity provider.
- * This is useful for routing libraries that need to wait for authentication state
- * before rendering protected routes.
+ * Ensure the Internet Identity library has been initialized.
+ * Resolves with the restored `Identity` if one was found (and authenticated),
+ * otherwise resolves with `undefined`.
  *
  * @returns A promise that resolves when initialization is complete
+ *          and yields the identity (or `undefined`).
  */
-export async function awaitInitialization(): Promise<void> {
-  // If already initialized, return immediately
+export async function ensureInitialized(): Promise<Identity | undefined> {
   const status = store.getSnapshot().context.status;
+
+  // If initialization errored, throw the stored error
+  if (status === "error") {
+    const err = store.getSnapshot().context.error;
+    throw err ?? new Error("Initialization failed");
+  }
+
+  // If not initializing, return the identity if authenticated, otherwise undefined
   if (status !== "initializing") {
-    return Promise.resolve();
+    return isAuthenticated() ? getIdentity() : undefined;
   }
 
   // Otherwise wait for the initialization promise
@@ -346,14 +355,21 @@ export function InternetIdentityProvider({
             identity,
             status: "success" as const,
           });
+
+          // Resolve the initialization promise with the restored identity
+          if (initializationResolve) {
+            initializationResolve(identity);
+            // Reset for potential re-initialization
+            initializationPromise = Promise.resolve(identity);
+          }
         } else {
           store.send({ type: "setState", status: "idle" as const });
-        }
-        // Resolve the initialization promise
-        if (initializationResolve) {
-          initializationResolve();
-          // Reset for potential re-initialization
-          initializationPromise = Promise.resolve();
+
+          // Resolve the initialization promise with undefined (no identity)
+          if (initializationResolve) {
+            initializationResolve(undefined);
+            initializationPromise = Promise.resolve(undefined);
+          }
         }
       } catch (error) {
         store.send({
