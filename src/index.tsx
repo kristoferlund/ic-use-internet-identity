@@ -8,7 +8,7 @@ import {
 } from "@dfinity/auth-client";
 import type { LoginOptions } from "./login-options.type";
 import type { Identity } from "@dfinity/agent";
-import type { InternetIdentityContext, Status } from "./context.type";
+import { type InternetIdentityContext, type Status } from "./context.type";
 import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
 const ONE_HOUR_IN_NANOSECONDS = BigInt(3_600_000_000_000);
@@ -45,6 +45,73 @@ const store = createStore({
     }),
   },
 });
+
+/**
+ * Promise that resolves when the initialization is complete.
+ * This allows external code (like TanStack Router) to await the initialization.
+ */
+let initializationResolve: (() => void) | null = null;
+let initializationReject: ((reason: Error) => void) | null = null;
+let initializationPromise: Promise<void> = new Promise<void>(
+  (resolve, reject) => {
+    initializationResolve = resolve;
+    initializationReject = reject;
+  },
+);
+
+/**
+ * Await the initialization of the Internet Identity provider.
+ * This is useful for routing libraries that need to wait for authentication state
+ * before rendering protected routes.
+ *
+ * @returns A promise that resolves when initialization is complete
+ */
+export async function awaitInitialization(): Promise<void> {
+  // If already initialized, return immediately
+  const status = store.getSnapshot().context.status;
+  if (status !== "initializing") {
+    return Promise.resolve();
+  }
+
+  // Otherwise wait for the initialization promise
+  return initializationPromise;
+}
+
+/**
+ * Check if the user is currently authenticated.
+ * This can be used outside of React components, for example in route guards.
+ *
+ * @returns true if the user has a valid identity, false otherwise
+ */
+export function isAuthenticated(): boolean {
+  const context = store.getSnapshot().context;
+  const identity = context.identity;
+
+  if (!identity) {
+    return false;
+  }
+
+  // Check if the identity is valid (not anonymous and delegation is still valid)
+  if (
+    !identity.getPrincipal().isAnonymous() &&
+    identity instanceof DelegationIdentity &&
+    isDelegationValid(identity.getDelegation())
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Get the current identity if authenticated.
+ * This can be used outside of React components.
+ *
+ * @returns The current identity or undefined
+ */
+export function getIdentity(): Identity | undefined {
+  return store.getSnapshot().context.identity;
+}
 
 /**
  * Create the auth client with default options or options provided by the user.
@@ -129,7 +196,7 @@ function login(): void {
     ...context.loginOptions,
   };
 
-  store.send({ type: "setState", status: "logging-in" as const });
+  store.send({ type: "setState", status: "logging-in" as const, error: undefined });
   void authClient.login(options);
   return;
 }
@@ -272,10 +339,21 @@ export function InternetIdentityProvider({
         });
         let authClient = store.getSnapshot().context.authClient;
         authClient ??= await createAuthClient();
-        const isAuthenticated = await authClient.isAuthenticated();
-        if (isAuthenticated) {
+        if (await authClient.isAuthenticated()) {
           const identity = authClient.getIdentity();
-          store.send({ type: "setState", identity });
+          store.send({
+            type: "setState",
+            identity,
+            status: "success" as const,
+          });
+        } else {
+          store.send({ type: "setState", status: "idle" as const });
+        }
+        // Resolve the initialization promise
+        if (initializationResolve) {
+          initializationResolve();
+          // Reset for potential re-initialization
+          initializationPromise = Promise.resolve();
         }
       } catch (error) {
         store.send({
@@ -284,11 +362,22 @@ export function InternetIdentityProvider({
           error:
             error instanceof Error ? error : new Error("Initialization failed"),
         });
-      } finally {
-        store.send({ type: "setState", status: "idle" as const });
+        // Reject the initialization promise
+        if (initializationReject) {
+          initializationReject(
+            error instanceof Error ? error : new Error("Initialization failed"),
+          );
+          // Reset for potential re-initialization
+          initializationPromise = Promise.reject(
+            error instanceof Error ? error : new Error("Initialization failed"),
+          );
+        }
       }
     })();
   }, [createOptions, loginOptions]);
 
   return children;
 }
+
+// Re-export types for external use (e.g., TanStack Router)
+export type { Status, InternetIdentityContext, LoginOptions };
