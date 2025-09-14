@@ -12,6 +12,7 @@
 - **Cached Identity**: The identity is cached in local storage and restored on page load. This allows the user to stay logged in even if the page is refreshed.
 - **Login progress**: State variables are provided to indicate whether the user is logged in, logging in, or logged out.
 - **Works with ic-use-actor**: Plays nicely with [ic-use-actor](https://www.npmjs.com/package/ic-use-actor) that provides easy access to canister methods.
+- **TanStack Router Integration**: Provides `ensureInitialized()` and `isAuthenticated()` functions for seamless integration with TanStack Router's route guards.
 
 ## Table of Contents
 
@@ -23,13 +24,20 @@
     - [Prerequisites](#prerequisites)
     - [1. Setup the `InternetIdentityProvider` component](#1-setup-the-internetidentityprovider-component)
     - [2. Connect the `login()` function to a button](#2-connect-the-login-function-to-a-button)
+    - [Monitoring the Login Process](#monitoring-the-login-process)
+    - [Status Helper Properties](#status-helper-properties)
     - [3. Use the `identity` context variable to access the identity](#3-use-the-identity-context-variable-to-access-the-identity)
   - [InternetIdentityProvider props](#internetidentityprovider-props)
   - [LoginOptions](#loginoptions)
   - [useInternetIdentity interface](#useinternetidentity-interface)
   - [Error Handling](#error-handling)
+  - [TanStack Router Integration](#tanstack-router-integration)
+    - [Available Functions](#available-functions)
+    - [Basic Example](#basic-example)
+    - [Client-side (reactive) Auth Guard](#client-side-reactive-auth-guard)
+    - [Creating a Route Guard Helper](#creating-a-route-guard-helper)
+    - [Important Notes](#important-notes)
   - [Security Considerations](#security-considerations)
-  - [Troubleshooting](#troubleshooting)
   - [Updates](#updates)
   - [Author](#author)
   - [Contributing](#contributing)
@@ -383,6 +391,113 @@ export function LoginComponent() {
   );
 }
 ```
+
+## TanStack Router Integration
+
+When using `ic-use-internet-identity` with TanStack Router, it is recommended to handle the initialization phase before allowing navigation to protected routes. The library now exports utility functions that work outside of React components:
+
+### Available Functions
+
+```typescript
+// Wait for the identity initialization to complete and get restored identity
+ensureInitialized(): Promise<Identity | undefined>
+
+// Check if user is authenticated 
+isAuthenticated(): boolean
+
+// Get the current identity 
+getIdentity(): Identity | undefined
+```
+
+### Basic Example
+
+Here's how to protect routes with TanStack Router:
+
+```tsx
+import { createRoute, redirect } from "@tanstack/react-router";
+import { ensureInitialized, isAuthenticated } from "ic-use-internet-identity";
+
+// Protected route example
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "dashboard",
+  beforeLoad: async () => {
+    const identity = await ensureInitialized();
+    if (!identity) {
+      throw redirect({ to: "/login" });
+    }
+  },
+  component: DashboardComponent,
+});
+```
+
+### Client-side (reactive) Auth Guard
+
+Note: `beforeLoad` is executed during navigation and does **not** re-run when authentication state changes. If a user signs out after a route has already loaded, the `beforeLoad` hook will not be invoked again. To handle dynamic changes in authentication (for example, user-initiated sign out), provide a React component that observes the hook and reacts to changes at runtime.
+
+```tsx
+import { useRouter } from "@tanstack/react-router";
+import { useInternetIdentity } from "ic-use-internet-identity";
+import { useEffect } from "react";
+
+export function AuthGuard() {
+  const router = useRouter();
+  const { identity } = useInternetIdentity();
+
+  useEffect(() => {
+    if (!identity) {
+      void router.invalidate() // This forces beforeLoad to be re-run and user directed to login page
+    }
+  }, [identity, router]);
+
+  return null;
+}
+```
+
+### Creating a Route Guard Helper
+
+For multiple protected routes you can extract a small `beforeLoad` helper and use TanStack Router's file-route helpers. Below are two patterns: a simple `authenticateRoute()` helper and an example showing how to create a protected file route with `createFileRoute`.
+
+```ts
+// authenticateRoute helper function: src/lib/authenticate-route.ts
+import { ensureInitialized } from "ic-use-internet-identity";
+import { redirect } from "@tanstack/react-router";
+
+export async function authenticateRoute() {
+  try {
+    const identity = await ensureInitialized();
+    if (identity) {
+      return
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  // eslint-disable-next-line @typescript-eslint/only-throw-error
+  throw redirect({ to: "/login" });
+}
+```
+
+```ts
+// Example file route: src/routes/about.tsx
+import { createFileRoute } from "@tanstack/react-router";
+import { authenticateRoute } from "../lib/authenticate-route";
+import About from "../components/About";
+
+export const Route = createFileRoute("/about")({
+  beforeLoad: async () => authenticateRoute(),
+  component: About,
+});
+```
+
+### Important Notes
+
+1. **Always await initialization**: The `ensureInitialized()` function ensures the library has finished checking for cached identities before making routing decisions.
+
+2. **Double-check in components**: `beforeLoad` runs once during navigation and does not react to later authentication changes (for example, when a user signs out). Use the `useInternetIdentity` hook in your components — or the `AuthGuard` component above — to observe auth state changes and perform redirects or show fallback UI.
+
+3. **Handle loading states**: During initialization (< 1 second), consider showing a loading spinner or splash screen.
+
+4. **Redirect patterns**: You can either redirect to a login page or let components handle the unauthenticated state based on your UX preferences.
 
 ## Security Considerations
 
