@@ -12,7 +12,7 @@
 - **Cached Identity**: The identity is cached in local storage and restored on page load. This allows the user to stay logged in even if the page is refreshed.
 - **Login progress**: State variables are provided to indicate whether the user is logged in, logging in, or logged out.
 - **Works with ic-use-actor**: Plays nicely with [ic-use-actor](https://www.npmjs.com/package/ic-use-actor) that provides easy access to canister methods.
-- **TanStack Router Integration**: Provides `ensureInitialized()` and `isAuthenticated()` functions for seamless integration with TanStack Router's route guards.
+- **Router integration**: Exposes `ensureInitialized()` and `isAuthenticated()` for use outside React (examples use TanStack Router).
 
 ## Table of Contents
 
@@ -31,7 +31,7 @@
   - [LoginOptions](#loginoptions)
   - [useInternetIdentity interface](#useinternetidentity-interface)
   - [Error Handling](#error-handling)
-  - [TanStack Router Integration](#tanstack-router-integration)
+  - [Router integration](#router-integration)
     - [Available Functions](#available-functions)
     - [Basic Example](#basic-example)
     - [Client-side (reactive) Auth Guard](#client-side-reactive-auth-guard)
@@ -392,9 +392,9 @@ export function LoginComponent() {
 }
 ```
 
-## TanStack Router Integration
+## Router integration
 
-When using `ic-use-internet-identity` with TanStack Router, it is recommended to handle the initialization phase before allowing navigation to protected routes. The library now exports utility functions that work outside of React components:
+When using `ic-use-internet-identity` with routing libraries (for example, TanStack Router), it's recommended to handle the initialization phase before allowing navigation to protected routes. The library exports utility functions that work outside of React components and can be used with many routing libraries — TanStack Router is shown here as an example.
 
 ### Available Functions
 
@@ -411,7 +411,7 @@ getIdentity(): Identity | undefined
 
 ### Basic Example
 
-Here's how to protect routes with TanStack Router:
+Here's how to protect routes (example: TanStack Router):
 
 ```tsx
 import { createRoute, redirect } from "@tanstack/react-router";
@@ -456,22 +456,25 @@ export function AuthGuard() {
 
 ### Creating a Route Guard Helper
 
-For multiple protected routes you can extract a small `beforeLoad` helper and use TanStack Router's file-route helpers. Below are two patterns: a simple `authenticateRoute()` helper and an example showing how to create a protected file route with `createFileRoute`.
+For multiple protected routes you can extract a small `beforeLoad` helper and use file-route helpers (the example below uses TanStack Router). Below are two patterns: a simple `authenticateRoute()` helper and an example showing how to create a protected file route with `createFileRoute`.
 
 ```ts
 // authenticateRoute helper function: src/lib/authenticate-route.ts
-import { ensureInitialized } from "ic-use-internet-identity";
 import { redirect } from "@tanstack/react-router";
+import { ensureInitialized } from "ic-use-internet-identity";
 
 export async function authenticateRoute() {
   try {
     const identity = await ensureInitialized();
-    if (identity) {
-      return
-    }
-  } catch (e) {
-    console.error(e);
+    if (identity) return;
+  } catch (err) {
+    console.error("Identity initialization failed:", err);
+    // Initialization error — redirect to an error page
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect({ to: "/error" });
   }
+
+  // No identity -> redirect to login
   // eslint-disable-next-line @typescript-eslint/only-throw-error
   throw redirect({ to: "/login" });
 }
