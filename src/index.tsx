@@ -351,9 +351,6 @@ export function InternetIdentityProvider({
     // If there is no pending initialization promise (e.g. cleaned up previously), create one.
     if (!initializationResolve) createInitializationPromise();
 
-    // active/cancel flag to avoid applying state from stale runs
-    let active = true;
-
     void (async () => {
       try {
         store.send({
@@ -366,11 +363,8 @@ export function InternetIdentityProvider({
         let authClient = store.getSnapshot().context.authClient;
         authClient ??= await createAuthClient();
 
-        if (!active) return;
-
         if (await authClient.isAuthenticated()) {
           const identity = authClient.getIdentity();
-          if (!active) return;
           store.send({
             type: "setState",
             identity,
@@ -386,7 +380,6 @@ export function InternetIdentityProvider({
             initializationPromise = Promise.resolve(identity);
           }
         } else {
-          if (!active) return;
           store.send({ type: "setState", status: "idle" as const, error: undefined });
 
           // Resolve the initialization promise with undefined (no identity)
@@ -398,7 +391,6 @@ export function InternetIdentityProvider({
           }
         }
       } catch (error) {
-        if (!active) return;
         const err = error instanceof Error ? error : new Error("Initialization failed");
         store.send({
           type: "setState",
@@ -411,21 +403,20 @@ export function InternetIdentityProvider({
           initializationReject(err);
           initializationResolve = null;
           initializationReject = null;
-          initializationPromise = Promise.reject(err) as Promise<Identity | undefined>;
+          initializationPromise = Promise.reject(err);
         }
       }
     })();
 
     return () => {
       // mark inactive
-      active = false;
       // If there's still a pending initialization, reject it so callers don't hang
       if (initializationReject) {
         const cancelErr = new Error("Initialization cancelled");
         initializationReject(cancelErr);
         initializationResolve = null;
         initializationReject = null;
-        initializationPromise = Promise.reject(cancelErr) as Promise<Identity | undefined>;
+        initializationPromise = Promise.reject(cancelErr);
       }
     };
   }, [createOptions, loginOptions]);
