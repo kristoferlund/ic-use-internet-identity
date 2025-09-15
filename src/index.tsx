@@ -47,23 +47,32 @@ const store = createStore({
 });
 
 /**
- * Promise that resolves when the initialization is complete.
- * It now resolves with an `Identity | undefined` so callers can
- * both wait for initialization and obtain the restored identity.
+ * Initialization promise handling
+ *
+ * - We create a pending `initializationPromise` at module load so callers
+ *   can await initialization before the provider mounts.
+ * - If the provider is remounted or re-initialized, the cleanup will reject
+ *   pending promises and a new one will be created on the next init.
  */
 let initializationResolve: ((identity?: Identity) => void) | null = null;
 let initializationReject: ((reason: Error) => void) | null = null;
-let initializationPromise: Promise<Identity | undefined> = new Promise<Identity | undefined>(
-  (resolve, reject) => {
+let initializationPromise: Promise<Identity | undefined>;
+
+function createInitializationPromise() {
+  initializationPromise = new Promise<Identity | undefined>((resolve, reject) => {
     initializationResolve = resolve;
     initializationReject = reject;
-  },
-);
+  });
+}
+
+// Create the initial promise so callers that call `ensureInitialized()` before
+// the provider mounts will properly wait for the real initialization.
+createInitializationPromise();
 
 /**
  * Ensure the Internet Identity library has been initialized.
  * Resolves with the restored `Identity` if one was found (and authenticated),
- * otherwise resolves with `undefined`.
+ * otherwise resolves with `undefined`. Rejects if initialization failed.
  *
  * @returns A promise that resolves when initialization is complete
  *          and yields the identity (or `undefined`).
@@ -142,13 +151,14 @@ async function createAuthClient(): Promise<AuthClient> {
 }
 
 /**
- * Helper function to set error state.
+ * Helper function to set error state. Accepts either Error or string.
  */
-function setError(errorMessage: string) {
+function setError(err: Error | string) {
+  const errorObj = typeof err === "string" ? new Error(err) : err;
   store.send({
     type: "setState",
     status: "error" as const,
-    error: new Error(errorMessage),
+    error: errorObj,
   });
 }
 
@@ -223,6 +233,7 @@ function onLoginSuccess(): void {
     type: "setState",
     identity,
     status: "success" as const,
+    error: undefined,
   });
 }
 
@@ -337,6 +348,12 @@ export function InternetIdentityProvider({
 }) {
   // Effect runs on mount. Creates an AuthClient and attempts to load a saved identity.
   useEffect(() => {
+    // If there is no pending initialization promise (e.g. cleaned up previously), create one.
+    if (!initializationResolve) createInitializationPromise();
+
+    // active/cancel flag to avoid applying state from stale runs
+    let active = true;
+
     void (async () => {
       try {
         store.send({
@@ -348,48 +365,69 @@ export function InternetIdentityProvider({
         });
         let authClient = store.getSnapshot().context.authClient;
         authClient ??= await createAuthClient();
+
+        if (!active) return;
+
         if (await authClient.isAuthenticated()) {
           const identity = authClient.getIdentity();
+          if (!active) return;
           store.send({
             type: "setState",
             identity,
             status: "success" as const,
+            error: undefined,
           });
 
           // Resolve the initialization promise with the restored identity
           if (initializationResolve) {
             initializationResolve(identity);
-            // Reset for potential re-initialization
+            initializationResolve = null;
+            initializationReject = null;
             initializationPromise = Promise.resolve(identity);
           }
         } else {
-          store.send({ type: "setState", status: "idle" as const });
+          if (!active) return;
+          store.send({ type: "setState", status: "idle" as const, error: undefined });
 
           // Resolve the initialization promise with undefined (no identity)
           if (initializationResolve) {
             initializationResolve(undefined);
+            initializationResolve = null;
+            initializationReject = null;
             initializationPromise = Promise.resolve(undefined);
           }
         }
       } catch (error) {
+        if (!active) return;
+        const err = error instanceof Error ? error : new Error("Initialization failed");
         store.send({
           type: "setState",
           status: "error" as const,
-          error:
-            error instanceof Error ? error : new Error("Initialization failed"),
+          error: err,
         });
+
         // Reject the initialization promise
         if (initializationReject) {
-          initializationReject(
-            error instanceof Error ? error : new Error("Initialization failed"),
-          );
-          // Reset for potential re-initialization
-          initializationPromise = Promise.reject(
-            error instanceof Error ? error : new Error("Initialization failed"),
-          );
+          initializationReject(err);
+          initializationResolve = null;
+          initializationReject = null;
+          initializationPromise = Promise.reject(err) as Promise<Identity | undefined>;
         }
       }
     })();
+
+    return () => {
+      // mark inactive
+      active = false;
+      // If there's still a pending initialization, reject it so callers don't hang
+      if (initializationReject) {
+        const cancelErr = new Error("Initialization cancelled");
+        initializationReject(cancelErr);
+        initializationResolve = null;
+        initializationReject = null;
+        initializationPromise = Promise.reject(cancelErr) as Promise<Identity | undefined>;
+      }
+    };
   }, [createOptions, loginOptions]);
 
   return children;
