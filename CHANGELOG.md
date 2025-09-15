@@ -7,18 +7,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.0] - 2025-09-15
 
-This version introduces functions that can be used outside of React to allow the library to be initialized in routing libraries 
-such as Tanstack Router. Instead of relying on custom React effects to initialize, we can use a more idiomatic approach and 
-initialize from `beforeLoad` (Tanstack Router).
+This version introduces **router integration support** through standalone utility functions that work outside of React components. This enables seamless integration with routing libraries like TanStack Router, React Router, and others, allowing for proper authentication checks during route transitions.
+
+### 🚀 Key Features
+
+This release addresses a common challenge when using authentication with modern routing libraries: **protecting routes before components mount**. Previously, developers had to rely on React effects and conditional rendering, which could lead to flickering UI and complex workarounds. Now you can properly integrate authentication into your routing logic.
 
 ### Added
-- `ensureInitialized(): Promise<Identity | undefined>` - Wait for the identity initialization to complete and get restored identity
-- `isAuthenticated(): boolean` - Check if user is authenticated 
-- `getIdentity(): Identity | undefined` - Get the current identity 
+
+#### New Utility Functions
+
+Three new functions are now exported for use outside React components:
+
+- **`ensureInitialized(): Promise<Identity | undefined>`**
+  Waits for the identity initialization to complete and returns the restored identity if available. This is essential for route guards to ensure the authentication state is fully loaded before making routing decisions.
+
+  ```typescript
+  // Example: Protecting a route with TanStack Router
+  const protectedRoute = createRoute({
+    path: "dashboard",
+    beforeLoad: async () => {
+      const identity = await ensureInitialized();
+      if (!identity) {
+        throw redirect({ to: "/login" });
+      }
+    },
+    component: DashboardComponent,
+  });
+  ```
+
+- **`isAuthenticated(): boolean`**
+  Synchronously checks if a user is currently authenticated. Useful for conditional logic where you don't need to wait for initialization.
+
+  ```typescript
+  // Example: Quick auth check
+  if (isAuthenticated()) {
+    // Show authenticated UI
+  } else {
+    // Show public UI
+  }
+  ```
+
+- **`getIdentity(): Identity | undefined`**
+  Synchronously retrieves the current identity. Returns `undefined` if not authenticated or still initializing.
+
+  ```typescript
+  // Example: Getting user principal outside React
+  const identity = getIdentity();
+  const principal = identity?.getPrincipal().toString();
+  ```
+
+#### Usage Example: Route Protection Pattern
+
+Here's a complete example showing how to create a reusable authentication guard:
+
+```typescript
+// src/lib/auth-guard.ts
+import { isRedirect, redirect } from "@tanstack/react-router";
+import { ensureInitialized } from "ic-use-internet-identity";
+
+export async function requireAuth() {
+  try {
+    const identity = await ensureInitialized();
+    if (!identity) {
+      throw redirect({ to: "/login" });
+    }
+    return identity;
+  } catch (err) {
+    if (isRedirect(err)) throw err;
+    console.error("Auth initialization failed:", err);
+    throw redirect({ to: "/error" });
+  }
+}
+
+// src/routes/protected.tsx
+export const Route = createFileRoute("/protected")({
+  beforeLoad: async () => requireAuth(),
+  component: ProtectedComponent,
+});
+```
 
 ### Fixed
 
-- Fixed stale `error` values persisting after successful login.
+- **Stale error values after successful login** - Previously, if a login attempt failed and then succeeded on retry, the error state would persist even after successful authentication. This has been fixed to properly clear error state on successful login, ensuring the UI accurately reflects the current authentication state.
+
+### Migration Guide
+
+No breaking changes in this release! The new functions are additive and work alongside the existing React hooks. However, if you're currently using React `useEffect` workarounds for route protection, consider migrating to the new pattern:
+
+**Before (v0.4.0):**
+```jsx
+// Checking auth in components with potential flicker
+function ProtectedRoute({ children }) {
+  const { identity, isInitializing } = useInternetIdentity();
+
+  if (isInitializing) return <Spinner />;
+  if (!identity) {
+    navigate("/login");
+    return null;
+  }
+
+  return children;
+}
+```
+
+**After (v0.5.0):**
+```typescript
+// Clean route-level protection
+const protectedRoute = createRoute({
+  beforeLoad: async () => {
+    const identity = await ensureInitialized();
+    if (!identity) throw redirect({ to: "/login" });
+  },
+  component: ProtectedComponent,
+});
+```
+
+### Important Notes
+
+1. The utility functions access the same underlying state as the React hooks, ensuring consistency across your application.
+2. `ensureInitialized()` typically resolves in under 1 second as it only needs to check for cached credentials.
+3. For dynamic auth changes (e.g., user logout), you'll still need to use the React hooks in your components or implement a reactive auth guard.
 
 
 ## [0.4.0] - 2025-08-06
