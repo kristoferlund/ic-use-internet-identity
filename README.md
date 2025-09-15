@@ -460,23 +460,25 @@ For multiple protected routes you can extract a small `beforeLoad` helper and us
 
 ```ts
 // authenticateRoute helper function: src/lib/authenticate-route.ts
-import { redirect } from "@tanstack/react-router";
+import { isRedirect, redirect } from "@tanstack/react-router";
 import { ensureInitialized } from "ic-use-internet-identity";
 
 export async function authenticateRoute() {
   try {
     const identity = await ensureInitialized();
-    if (identity) return;
+    if (!identity) {
+      // No identity -> redirect to login
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw redirect({ to: "/login" });
+    }
+    // Additional initialization, authenticate actor, etc.
   } catch (err) {
+    if (isRedirect(e)) throw e // Re-throw if error is a redirect
     console.error("Identity initialization failed:", err);
     // Initialization error — redirect to an error page
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw redirect({ to: "/error" });
   }
-
-  // No identity -> redirect to login
-  // eslint-disable-next-line @typescript-eslint/only-throw-error
-  throw redirect({ to: "/login" });
 }
 ```
 
