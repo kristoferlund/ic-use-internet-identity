@@ -8,7 +8,7 @@ import {
 } from "@dfinity/auth-client";
 import type { LoginOptions } from "./login-options.type";
 import type { Identity } from "@dfinity/agent";
-import type { InternetIdentityContext, Status } from "./context.type";
+import { type InternetIdentityContext, type Status } from "./context.type";
 import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
 const ONE_HOUR_IN_NANOSECONDS = BigInt(3_600_000_000_000);
@@ -47,6 +47,91 @@ const store = createStore({
 });
 
 /**
+ * Initialization promise handling
+ *
+ * - We create a pending `initializationPromise` at module load so callers
+ *   can await initialization before the provider mounts.
+ * - If the provider is remounted or re-initialized, the cleanup will reject
+ *   pending promises and a new one will be created on the next init.
+ */
+let initializationResolve: ((identity?: Identity) => void) | null = null;
+let initializationReject: ((reason: Error) => void) | null = null;
+let initializationPromise: Promise<Identity | undefined>;
+
+function createInitializationPromise() {
+  initializationPromise = new Promise<Identity | undefined>((resolve, reject) => {
+    initializationResolve = resolve;
+    initializationReject = reject;
+  });
+}
+
+// Create the initial promise so callers that call `ensureInitialized()` before
+// the provider mounts will properly wait for the real initialization.
+createInitializationPromise();
+
+/**
+ * Ensure the Internet Identity library has been initialized.
+ * Resolves with the restored `Identity` if one was found (and authenticated),
+ * otherwise resolves with `undefined`. Rejects if initialization failed.
+ *
+ * @returns A promise that resolves when initialization is complete
+ *          and yields the identity (or `undefined`).
+ */
+export async function ensureInitialized(): Promise<Identity | undefined> {
+  const status = store.getSnapshot().context.status;
+
+  // If initialization errored, throw the stored error
+  if (status === "error") {
+    const err = store.getSnapshot().context.error;
+    throw err ?? new Error("Initialization failed");
+  }
+
+  // If not initializing, return the identity if authenticated, otherwise undefined
+  if (status !== "initializing") {
+    return isAuthenticated() ? getIdentity() : undefined;
+  }
+
+  // Otherwise wait for the initialization promise
+  return initializationPromise;
+}
+
+/**
+ * Check if the user is currently authenticated.
+ * This can be used outside of React components, for example in route guards.
+ *
+ * @returns true if the user has a valid identity, false otherwise
+ */
+export function isAuthenticated(): boolean {
+  const context = store.getSnapshot().context;
+  const identity = context.identity;
+
+  if (!identity) {
+    return false;
+  }
+
+  // Check if the identity is valid (not anonymous and delegation is still valid)
+  if (
+    !identity.getPrincipal().isAnonymous() &&
+    identity instanceof DelegationIdentity &&
+    isDelegationValid(identity.getDelegation())
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Get the current identity if authenticated.
+ * This can be used outside of React components.
+ *
+ * @returns The current identity or undefined
+ */
+export function getIdentity(): Identity | undefined {
+  return store.getSnapshot().context.identity;
+}
+
+/**
  * Create the auth client with default options or options provided by the user.
  */
 async function createAuthClient(): Promise<AuthClient> {
@@ -66,13 +151,14 @@ async function createAuthClient(): Promise<AuthClient> {
 }
 
 /**
- * Helper function to set error state.
+ * Helper function to set error state. Accepts either Error or string.
  */
-function setError(errorMessage: string) {
+function setError(err: Error | string) {
+  const errorObj = typeof err === "string" ? new Error(err) : err;
   store.send({
     type: "setState",
     status: "error" as const,
-    error: new Error(errorMessage),
+    error: errorObj,
   });
 }
 
@@ -129,7 +215,7 @@ function login(): void {
     ...context.loginOptions,
   };
 
-  store.send({ type: "setState", status: "logging-in" as const });
+  store.send({ type: "setState", status: "logging-in" as const, error: undefined });
   void authClient.login(options);
   return;
 }
@@ -147,6 +233,7 @@ function onLoginSuccess(): void {
     type: "setState",
     identity,
     status: "success" as const,
+    error: undefined,
   });
 }
 
@@ -261,6 +348,9 @@ export function InternetIdentityProvider({
 }) {
   // Effect runs on mount. Creates an AuthClient and attempts to load a saved identity.
   useEffect(() => {
+    // If there is no pending initialization promise (e.g. cleaned up previously), create one.
+    if (!initializationResolve) createInitializationPromise();
+
     void (async () => {
       try {
         store.send({
@@ -272,23 +362,67 @@ export function InternetIdentityProvider({
         });
         let authClient = store.getSnapshot().context.authClient;
         authClient ??= await createAuthClient();
-        const isAuthenticated = await authClient.isAuthenticated();
-        if (isAuthenticated) {
+
+        if (await authClient.isAuthenticated()) {
           const identity = authClient.getIdentity();
-          store.send({ type: "setState", identity });
+          store.send({
+            type: "setState",
+            identity,
+            status: "success" as const,
+            error: undefined,
+          });
+
+          // Resolve the initialization promise with the restored identity
+          if (initializationResolve) {
+            initializationResolve(identity);
+            initializationResolve = null;
+            initializationReject = null;
+            initializationPromise = Promise.resolve(identity);
+          }
+        } else {
+          store.send({ type: "setState", status: "idle" as const, error: undefined });
+
+          // Resolve the initialization promise with undefined (no identity)
+          if (initializationResolve) {
+            initializationResolve(undefined);
+            initializationResolve = null;
+            initializationReject = null;
+            initializationPromise = Promise.resolve(undefined);
+          }
         }
       } catch (error) {
+        const err = error instanceof Error ? error : new Error("Initialization failed");
         store.send({
           type: "setState",
           status: "error" as const,
-          error:
-            error instanceof Error ? error : new Error("Initialization failed"),
+          error: err,
         });
-      } finally {
-        store.send({ type: "setState", status: "idle" as const });
+
+        // Reject the initialization promise
+        if (initializationReject) {
+          initializationReject(err);
+          initializationResolve = null;
+          initializationReject = null;
+          initializationPromise = Promise.reject(err);
+        }
       }
     })();
+
+    return () => {
+      // mark inactive
+      // If there's still a pending initialization, reject it so callers don't hang
+      if (initializationReject) {
+        const cancelErr = new Error("Initialization cancelled");
+        initializationReject(cancelErr);
+        initializationResolve = null;
+        initializationReject = null;
+        initializationPromise = Promise.reject(cancelErr);
+      }
+    };
   }, [createOptions, loginOptions]);
 
   return children;
 }
+
+// Re-export types for external use (e.g., TanStack Router)
+export type { Status, InternetIdentityContext, LoginOptions };
