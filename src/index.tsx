@@ -407,18 +407,6 @@ export function InternetIdentityProvider({
         }
       }
     })();
-
-    return () => {
-      // mark inactive
-      // If there's still a pending initialization, reject it so callers don't hang
-      if (initializationReject) {
-        const cancelErr = new Error("Initialization cancelled");
-        initializationReject(cancelErr);
-        initializationResolve = null;
-        initializationReject = null;
-        initializationPromise = Promise.reject(cancelErr);
-      }
-    };
   }, [createOptions, loginOptions]);
 
   return children;
