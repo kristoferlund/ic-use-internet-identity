@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-10-01
+
+### ⚠️ Breaking Changes
+
+- **Default idle behavior**: Idle management now enabled by default with custom `onIdle` callback that resets authentication state on expiry. Previously disabled.
+- **To disable**: Set `createOptions.idleOptions.disableIdle: true`.
+
+### Added
+
+- **Reactive identity expiry**: Automatically resets state when delegation expires (based on `maxTimeToLive`), without page reloads.
+- **Configurable idle timeout**: Derived from `loginOptions.maxTimeToLive` (default: 1 hour).
+
+### Migration Guide
+
+To disable idle if unwanted:
+
+```tsx
+<InternetIdentityProvider
+  createOptions={{ idleOptions: { disableIdle: true } }}
+>
+  <App />
+</InternetIdentityProvider>
+```
+
+Monitor `identity` and `status` for expiry in components.
+
 ## [0.5.0] - 2025-09-15
 
 This version introduces **router integration support** through standalone utility functions that work outside of React components. This enables seamless integration with routing libraries like TanStack Router, React Router, and others, allowing for proper authentication checks during route transitions.
