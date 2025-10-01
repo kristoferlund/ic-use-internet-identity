@@ -11,6 +11,7 @@
 
 - **Cached Identity**: The identity is cached in local storage and restored on page load. This allows the user to stay logged in even if the page is refreshed.
 - **Login progress**: State variables are provided to indicate whether the user is logged in, logging in, or logged out.
+- **Reactive Identity Expiry**: Automatically resets authentication state when the identity expires, keeping your app in sync without page reloads.
 - **Works with ic-use-actor**: Plays nicely with [ic-use-actor](https://www.npmjs.com/package/ic-use-actor) that provides easy access to canister methods.
 - **Router integration**: Exposes `ensureInitialized()` and `isAuthenticated()` for use outside React (examples use TanStack Router).
 
@@ -265,14 +266,27 @@ export const useActor = createUseActorHook<_SERVICE>(actorContext);
 {
   /** Options for creating the {@link AuthClient}. See AuthClient documentation for list of options
    *
-   *`ic-use-internet-identity` defaults to disabling the AuthClient idle handling (clearing identities
-   * from store and reloading the window on identity expiry). If that behaviour is preferred, set these settings:
+   *`ic-use-internet-identity` now defaults to enabling idle handling with a custom callback that resets
+   * the identity state when it expires, instead of reloading the window. To disable idle handling entirely,
+   * set these settings:
    *
    * ```
    * const options = {
    *   idleOptions: {
-   *     disableDefaultIdleCallback: false,
-   *     disableIdle: false,
+   *     disableIdle: true,
+   *   },
+   * }
+   * ```
+   *
+   * To provide a custom idle callback instead of the default state reset:
+   *
+   * ```
+   * const options = {
+   *   idleOptions: {
+   *     onIdle: () => {
+   *       console.log("Identity expired");
+   *       // Custom logic here
+   *     },
    *   },
    * }
    * ```
@@ -506,9 +520,9 @@ export const Route = createFileRoute("/about")({
 
 ## Security Considerations
 
-- **Delegation Expiry**: By default, delegations expire after 1 hour. Monitor `identity` for changes and handle re-authentication.
+- **Delegation Expiry**: By default, delegations expire after 1 hour and the identity state is automatically reset. Monitor `identity` for changes and handle re-authentication.
 - **Secure Storage**: Identities are stored in browser local storage. Consider the security implications for your use case.
-- **Session Management**: The library disables automatic logout on idle by default. Consider your app's security requirements.
+- **Session Management**: The library enables automatic identity reset on expiry by default. To disable, set `createOptions.idleOptions.disableIdle: true`. Consider your app's security requirements.
 
 ## Updates
 
