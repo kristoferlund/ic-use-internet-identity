@@ -257,9 +257,11 @@ function clear(): void {
 
   void authClient
     .logout()
-    .then(() => {
+    .then(async () => {
+      const authClient = await createAuthClient();
       store.send({
         type: "setState",
+        authClient,
         identity: undefined,
         status: "idle" as const,
         error: undefined,
