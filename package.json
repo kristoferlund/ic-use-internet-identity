@@ -33,17 +33,15 @@
     "@xstate/store": "^3.8.5"
   },
   "peerDependencies": {
-    "@dfinity/agent": ">=3.1.0",
-    "@dfinity/auth-client": ">=3.1.0",
-    "@dfinity/identity": ">=3.1.0",
+    "@dfinity/agent": "^3",
+    "@dfinity/auth-client": "^3",
+    "@dfinity/identity": "^3",
     "react": ">=18.0.0"
   },
   "devDependencies": {
-    "@dfinity/agent": "^3.1.0",
-    "@dfinity/auth-client": "^3.1.0",
-    "@dfinity/candid": "^3.1.0",
-    "@dfinity/identity": "^3.1.0",
-    "@dfinity/principal": "^3.1.0",
+    "@dfinity/agent": "^3.2.7",
+    "@dfinity/auth-client": "^3.2.7",
+    "@dfinity/identity": "^3.2.7",
     "@eslint/js": "^9.26.0",
     "@types/node": "^20.10.6",
     "@types/react": "^18.2.39",
