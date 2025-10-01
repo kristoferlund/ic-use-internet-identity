@@ -5,7 +5,7 @@
   "author": "Kristofer Lund <kristofer@kristoferlund.se>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kristoferlund/ic-use-internet-identity"
+    "url": "git+https://github.com/kristoferlund/ic-use-internet-identity.git"
   },
   "bugs": "https://github.com/kristoferlund/ic-use-internet-identity/issues",
   "homepage": "https://github.com/kristoferlund/ic-use-internet-identity",
