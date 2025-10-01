@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Reactive identity expiry**: Automatically resets state when delegation expires (based on `maxTimeToLive`), without page reloads.
 - **Configurable idle timeout**: Derived from `loginOptions.maxTimeToLive` (default: 1 hour).
 
+### Changed
+
+- **Cleanup code**: Removed unnecessary cleanup code ([0ba8b58](https://github.com/kristoferlund/ic-use-internet-identity/commit/0ba8b58)).
+
+### Fixed
+
+- **AuthClient reset on logout**: Fixed bug where AuthClient could fail to save the current identity under certain conditions. Resetting the AuthClient on logout solves the issue. ([0b83330](https://github.com/kristoferlund/ic-use-internet-identity/commit/0b83330)).
+
 ### Migration Guide
 
 To disable idle if unwanted:
