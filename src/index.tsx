@@ -135,12 +135,23 @@ export function getIdentity(): Identity | undefined {
  * Create the auth client with default options or options provided by the user.
  */
 async function createAuthClient(): Promise<AuthClient> {
+  const loginOptions = store.getSnapshot().context.loginOptions;
   const createOptions = store.getSnapshot().context.createOptions;
   const options: AuthClientCreateOptions = {
     idleOptions: {
-      // Default behaviour of this hook is not to logout and reload window on identity expiration
-      disableDefaultIdleCallback: true,
-      disableIdle: true,
+      // Default behaviour of this hook is to reset the identity when it reaches `maxTimeToLive` 
+      idleTimeout: loginOptions?.maxTimeToLive ? Number(loginOptions.maxTimeToLive / 1_000_000n) : undefined,
+      // The identity reset behaviour can be prevented by setting `idleOptions.disableIdle = true`
+      onIdle: createOptions?.idleOptions?.disableIdle ? undefined : async () => {
+        const authClient = await createAuthClient();
+        store.send({
+          type: "setState",
+          authClient,
+          identity: undefined,
+          status: "idle" as const,
+          error: undefined,
+        });
+      },
       ...createOptions?.idleOptions,
     },
     ...createOptions,
