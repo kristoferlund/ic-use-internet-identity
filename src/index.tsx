@@ -13,6 +13,7 @@ import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
 const ONE_HOUR_IN_NANOSECONDS = BigInt(3_600_000_000_000);
 const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
+const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
 let expiryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -38,12 +39,12 @@ function scheduleClearForIdentity(identity: Identity, fallbackTtlNs?: bigint): v
       }
     }
     if (minExp !== null) {
-      delayMs = Math.max(0, nsToMs(minExp) - Date.now() - 1000);
+      delayMs = Math.max(0, nsToMs(minExp) - Date.now() - EXPIRY_BUFFER_MS);
     }
   }
 
   if (delayMs === null && fallbackTtlNs !== undefined) {
-    delayMs = Math.max(0, nsToMs(fallbackTtlNs) - 1000);
+    delayMs = Math.max(0, nsToMs(fallbackTtlNs) - EXPIRY_BUFFER_MS);
   }
 
   if (delayMs !== null) {
@@ -399,7 +400,7 @@ export function InternetIdentityProvider({
    */
   loginOptions?: LoginOptions;
 
-  /** Clear the identity automatically on expiration. Default value is `true`. The identity is cleared one second
+  /** Clear the identity automatically on expiration. Default value is `true`. The identity is cleared five minutes
    * before the identity expires to avoid any issues with ICP system time and local time being out of sync.
    */
   clearIdentityOnExpiry?: boolean;
