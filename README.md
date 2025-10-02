@@ -513,7 +513,7 @@ export const Route = createFileRoute("/about")({
 
 - **Delegation Expiry**: By default, delegations expire after 1 hour and the identity state is automatically reset. Monitor `identity` for changes and handle re-authentication.
 - **Secure Storage**: Identities are stored in browser local storage. Consider the security implications for your use case.
-- **Session Management**: The library automatically clears the identity one second before expiry by default. To disable, set `clearIdentityOnExpiry={false}` on the `InternetIdentityProvider`. Consider your app's security requirements.
+- **Session Management**: The library automatically clears the identity five minutes before expiry by default. To disable, set `clearIdentityOnExpiry={false}` on the `InternetIdentityProvider`. Consider your app's security requirements.
 
 ## Updates
 
