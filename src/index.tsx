@@ -7,50 +7,13 @@ import {
   type AuthClientLoginOptions,
 } from "@dfinity/auth-client";
 import type { LoginOptions } from "./login-options.type";
-import type { Identity } from "@dfinity/agent";
+import { HttpAgent, type Identity } from "@dfinity/agent";
 import { type InternetIdentityContext, type Status } from "./context.type";
 import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
-const ONE_HOUR_IN_NANOSECONDS = BigInt(3_600_000_000_000);
 const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
-const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
-
-let expiryTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-function nsToMs(ns: bigint): number {
-  return Number(ns / 1_000_000n);
-}
-
-function scheduleClearForIdentity(identity: Identity, fallbackTtlNs?: bigint): void {
-  if (expiryTimeoutId) {
-    clearTimeout(expiryTimeoutId);
-    expiryTimeoutId = null;
-  }
-
-  let delayMs: number | null = null;
-
-  if (identity instanceof DelegationIdentity) {
-    const chain = identity.getDelegation();
-    let minExp: bigint | null = null;
-    for (const d of chain.delegations) {
-      const exp = d.delegation.expiration;
-      if (minExp === null || exp < minExp) {
-        minExp = exp;
-      }
-    }
-    if (minExp !== null) {
-      delayMs = Math.max(0, nsToMs(minExp) - Date.now() - EXPIRY_BUFFER_MS);
-    }
-  }
-
-  if (delayMs === null && fallbackTtlNs !== undefined) {
-    delayMs = Math.max(0, nsToMs(fallbackTtlNs) - EXPIRY_BUFFER_MS);
-  }
-
-  if (delayMs !== null) {
-    expiryTimeoutId = setTimeout(clear, delayMs);
-  }
-}
+const ONE_HOUR_NS = BigInt(3_600_000_000_000);
+const EXPIRY_BUFFER_MS = 1 * 60 * 1000;
 
 export interface StoreContext {
   providerComponentPresent: boolean;
@@ -85,6 +48,51 @@ const store = createStore({
     }),
   },
 });
+
+let expiryTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+function nsToMs(ns: bigint): number {
+  return Number(ns / 1_000_000n);
+}
+
+async function scheduleClearForIdentity(identity: Identity, fallbackTtlNs?: bigint): Promise<void> {
+  if (expiryTimeoutId) {
+    clearTimeout(expiryTimeoutId);
+    expiryTimeoutId = null;
+  }
+
+  // Get the time drift between client system time and IC system time
+  const agent = await HttpAgent.create({
+    shouldFetchRootKey: process.env.DFX_NETWORK !== "ic",
+  });
+  await agent.syncTime();
+  const timeDiff = agent.getTimeDiffMsecs();
+
+  let delay: number | null = null;
+
+  if (identity instanceof DelegationIdentity) {
+    const chain = identity.getDelegation();
+    let minExp: bigint | null = null;
+    for (const d of chain.delegations) {
+      const exp = d.delegation.expiration;
+      if (minExp === null || exp < minExp) {
+        minExp = exp;
+      }
+    }
+    if (minExp !== null) {
+      delay = Math.max(0, nsToMs(minExp) - Date.now() - timeDiff - EXPIRY_BUFFER_MS);
+    }
+  }
+
+  if (delay === null && fallbackTtlNs !== undefined) {
+    delay = Math.max(0, nsToMs(fallbackTtlNs) - timeDiff - EXPIRY_BUFFER_MS);
+  }
+
+  if (delay !== null) {
+    expiryTimeoutId = setTimeout(clear, delay);
+  }
+}
+
 
 /**
  * Initialization promise handling
@@ -251,7 +259,7 @@ function login(): void {
     identityProvider: DEFAULT_IDENTITY_PROVIDER,
     onSuccess: onLoginSuccess,
     onError: onLoginError,
-    maxTimeToLive: ONE_HOUR_IN_NANOSECONDS,
+    maxTimeToLive: ONE_HOUR_NS,
     ...context.loginOptions,
   };
 
@@ -263,7 +271,7 @@ function login(): void {
 /**
  * Callback, login was successful. Saves identity to state.
  */
-function onLoginSuccess(): void {
+async function onLoginSuccess(): Promise<void> {
   const context = store.getSnapshot().context;
   const identity = context.authClient?.getIdentity();
   if (!identity) {
@@ -272,7 +280,7 @@ function onLoginSuccess(): void {
   }
 
   if (context.clearIdentityOnExpiry) {
-    scheduleClearForIdentity(identity, context.loginOptions?.maxTimeToLive ?? ONE_HOUR_IN_NANOSECONDS);
+    await scheduleClearForIdentity(identity, context.loginOptions?.maxTimeToLive ?? ONE_HOUR_NS);
   }
 
   store.send({
@@ -427,7 +435,7 @@ export function InternetIdentityProvider({
           const identity = authClient.getIdentity();
 
           if (clearIdentityOnExpiry) {
-            scheduleClearForIdentity(identity);
+            await scheduleClearForIdentity(identity);
           }
 
           store.send({
