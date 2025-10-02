@@ -14,6 +14,43 @@ import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 const ONE_HOUR_IN_NANOSECONDS = BigInt(3_600_000_000_000);
 const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
 
+let expiryTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+function nsToMs(ns: bigint): number {
+  return Number(ns / 1_000_000n);
+}
+
+function scheduleClearForIdentity(identity: Identity, fallbackTtlNs?: bigint): void {
+  if (expiryTimeoutId) {
+    clearTimeout(expiryTimeoutId);
+    expiryTimeoutId = null;
+  }
+
+  let delayMs: number | null = null;
+
+  if (identity instanceof DelegationIdentity) {
+    const chain = identity.getDelegation();
+    let minExp: bigint | null = null;
+    for (const d of chain.delegations) {
+      const exp = d.delegation.expiration;
+      if (minExp === null || exp < minExp) {
+        minExp = exp;
+      }
+    }
+    if (minExp !== null) {
+      delayMs = Math.max(0, nsToMs(minExp) - Date.now() - 1000);
+    }
+  }
+
+  if (delayMs === null && fallbackTtlNs !== undefined) {
+    delayMs = Math.max(0, nsToMs(fallbackTtlNs) - 1000);
+  }
+
+  if (delayMs !== null) {
+    expiryTimeoutId = setTimeout(clear, delayMs);
+  }
+}
+
 export interface StoreContext {
   providerComponentPresent: boolean;
   authClient?: AuthClient;
@@ -233,10 +270,8 @@ function onLoginSuccess(): void {
     return;
   }
 
-  // Clear identity one second before it expires
   if (context.clearIdentityOnExpiry) {
-    const maxTimeToLiveMs = context.loginOptions?.maxTimeToLive ? Number(context.loginOptions.maxTimeToLive / 1_000_000n) : Number(ONE_HOUR_IN_NANOSECONDS / 1_000_000n);
-    setTimeout(clear, maxTimeToLiveMs - 1000);
+    scheduleClearForIdentity(identity, context.loginOptions?.maxTimeToLive ?? ONE_HOUR_IN_NANOSECONDS);
   }
 
   store.send({
@@ -263,6 +298,11 @@ function clear(): void {
   if (!authClient) {
     setError("Auth client not initialized");
     return;
+  }
+
+  if (expiryTimeoutId) {
+    clearTimeout(expiryTimeoutId);
+    expiryTimeoutId = null;
   }
 
   void authClient
@@ -385,15 +425,8 @@ export function InternetIdentityProvider({
         if (await authClient.isAuthenticated()) {
           const identity = authClient.getIdentity();
 
-          // Clear identity one second before it expires 
           if (clearIdentityOnExpiry) {
-            if (identity instanceof DelegationIdentity) {
-              const delegationChain = identity.getDelegation();
-              const expiration = delegationChain.delegations[0]?.delegation.expiration;
-              if (expiration) {
-                setTimeout(clear, Number(expiration / 1_000_000n) - Date.now() - 1000);
-              }
-            }
+            scheduleClearForIdentity(identity);
           }
 
           store.send({
