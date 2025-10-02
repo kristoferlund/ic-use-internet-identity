@@ -13,7 +13,7 @@ import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
 const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
 const ONE_HOUR_NS = BigInt(3_600_000_000_000);
-const EXPIRY_BUFFER_MS = 1 * 60 * 1000;
+const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
 export interface StoreContext {
   providerComponentPresent: boolean;
@@ -55,6 +55,17 @@ function nsToMs(ns: bigint): number {
   return Number(ns / 1_000_000n);
 }
 
+/**
+ * Schedules automatic clearing of the identity before it expires.
+ * 
+ * Calculates the time difference between client and IC system time to ensure
+ * accurate expiration timing. Uses the earliest expiration from the delegation
+ * chain, or falls back to the provided TTL. Clears any existing scheduled timeout
+ * before scheduling a new one.
+ * 
+ * @param identity - The identity to schedule clearing for
+ * @param fallbackTtlNs - Optional fallback TTL in nanoseconds if delegation chain unavailable
+ */
 async function scheduleClearForIdentity(identity: Identity, fallbackTtlNs?: bigint): Promise<void> {
   if (expiryTimeoutId) {
     clearTimeout(expiryTimeoutId);
