@@ -22,6 +22,7 @@ export interface StoreContext {
   status: Status;
   error?: Error;
   identity?: Identity;
+  clearIdentityOnExpiry: boolean;
 }
 
 type StoreEvent = { type: "setState" } & Partial<StoreContext>;
@@ -34,6 +35,7 @@ const initialContext: StoreContext = {
   status: "initializing",
   error: undefined,
   identity: undefined,
+  clearIdentityOnExpiry: true,
 };
 
 const store = createStore({
@@ -135,23 +137,12 @@ export function getIdentity(): Identity | undefined {
  * Create the auth client with default options or options provided by the user.
  */
 async function createAuthClient(): Promise<AuthClient> {
-  const loginOptions = store.getSnapshot().context.loginOptions;
   const createOptions = store.getSnapshot().context.createOptions;
   const options: AuthClientCreateOptions = {
     idleOptions: {
-      // Default behaviour of this hook is to reset the identity when it reaches `maxTimeToLive` 
-      idleTimeout: loginOptions?.maxTimeToLive ? Number(loginOptions.maxTimeToLive / 1_000_000n) : undefined,
-      // The identity reset behaviour can be prevented by setting `idleOptions.disableIdle = true`
-      onIdle: createOptions?.idleOptions?.disableIdle ? undefined : async () => {
-        const authClient = await createAuthClient();
-        store.send({
-          type: "setState",
-          authClient,
-          identity: undefined,
-          status: "idle" as const,
-          error: undefined,
-        });
-      },
+      // Default behaviour of this hook is not to logout and reload window on user being idle
+      disableDefaultIdleCallback: true,
+      disableIdle: true,
       ...createOptions?.idleOptions,
     },
     ...createOptions,
@@ -235,11 +226,19 @@ function login(): void {
  * Callback, login was successful. Saves identity to state.
  */
 function onLoginSuccess(): void {
-  const identity = store.getSnapshot().context.authClient?.getIdentity();
+  const context = store.getSnapshot().context;
+  const identity = context.authClient?.getIdentity();
   if (!identity) {
     setError("Identity not found after successful login");
     return;
   }
+
+  // Clear identity one second before it expires
+  if (context.clearIdentityOnExpiry) {
+    const maxTimeToLiveMs = context.loginOptions?.maxTimeToLive ? Number(context.loginOptions.maxTimeToLive / 1_000_000n) : Number(ONE_HOUR_IN_NANOSECONDS / 1_000_000n);
+    setTimeout(clear, maxTimeToLiveMs - 1000);
+  }
+
   store.send({
     type: "setState",
     identity,
@@ -333,6 +332,7 @@ export function InternetIdentityProvider({
   children,
   createOptions,
   loginOptions,
+  clearIdentityOnExpiry = true,
 }: {
   /** The child components that the InternetIdentityProvider will wrap. This allows any child
    * component to access the authentication context provided by the InternetIdentityProvider. */
@@ -358,6 +358,11 @@ export function InternetIdentityProvider({
    * the {@link AuthClientLoginOptions}.
    */
   loginOptions?: LoginOptions;
+
+  /** Clear the identity automatically on expiration. Default value is `true`. The identity is cleared one second
+   * before the identity expires to avoid any issues with ICP system time and local time being out of sync.
+   */
+  clearIdentityOnExpiry?: boolean;
 }) {
   // Effect runs on mount. Creates an AuthClient and attempts to load a saved identity.
   useEffect(() => {
@@ -372,12 +377,25 @@ export function InternetIdentityProvider({
           status: "initializing" as const,
           createOptions,
           loginOptions,
+          clearIdentityOnExpiry,
         });
         let authClient = store.getSnapshot().context.authClient;
         authClient ??= await createAuthClient();
 
         if (await authClient.isAuthenticated()) {
           const identity = authClient.getIdentity();
+
+          // Clear identity one second before it expires 
+          if (clearIdentityOnExpiry) {
+            if (identity instanceof DelegationIdentity) {
+              const delegationChain = identity.getDelegation();
+              const expiration = delegationChain.delegations[0]?.delegation.expiration;
+              if (expiration) {
+                setTimeout(clear, Number(expiration / 1_000_000n) - Date.now() - 1000);
+              }
+            }
+          }
+
           store.send({
             type: "setState",
             identity,
@@ -420,7 +438,7 @@ export function InternetIdentityProvider({
         }
       }
     })();
-  }, [createOptions, loginOptions]);
+  }, [createOptions, loginOptions, clearIdentityOnExpiry]);
 
   return children;
 }
