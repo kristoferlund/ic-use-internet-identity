@@ -72,12 +72,14 @@ async function scheduleClearForIdentity(identity: Identity, fallbackTtlNs?: bigi
     expiryTimeoutId = null;
   }
 
-  // Get the time drift between client system time and IC system time
-  const agent = await HttpAgent.create({
-    shouldFetchRootKey: process.env.DFX_NETWORK !== "ic",
-  });
-  await agent.syncTime();
-  const timeDiff = agent.getTimeDiffMsecs();
+  // Get the time diff between client system time and IC system time. This behaviour is not needed and
+  // disabled in local development.
+  let timeDiff = 0;
+  if (process.env.DFX_NETWORK !== "local") {
+    const agent = await HttpAgent.create({});
+    await agent.syncTime();
+    timeDiff = agent.getTimeDiffMsecs();
+  }
 
   let delay: number | null = null;
 
