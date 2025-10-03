@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-10-02
+
+### Added
+
+- **`clearIdentityOnExpiry` option**: New optional prop for `InternetIdentityProvider` that automatically clears the identity before it expires. Defaults to `true`.
+- **Time synchronization**: Added IC system time synchronization to accurately calculate identity expiration timing, accounting for any time drift between client and IC.
+
+### Changed
+
+- **Idle handling reverted**: Removed AuthClient's default idle handling and replaced with manual timer-based identity clearing. This provides more predictable behavior and better control.
+- **Improved expiration accuracy**: Identity is now cleared based on the earliest expiration in the delegation chain, with time drift compensation for precise timing.
+
 ## [0.6.0] - 2025-10-01
 
 ### ⚠️ Breaking Changes

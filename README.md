@@ -266,27 +266,14 @@ export const useActor = createUseActorHook<_SERVICE>(actorContext);
 {
   /** Options for creating the {@link AuthClient}. See AuthClient documentation for list of options
    *
-   *`ic-use-internet-identity` now defaults to enabling idle handling with a custom callback that resets
-   * the identity state when it expires, instead of reloading the window. To disable idle handling entirely,
-   * set these settings:
+   *`ic-use-internet-identity` defaults to disabling the AuthClient idle handling (clearing identities
+   * from store and reloading the window when user is idle). If that behaviour is preferred, set these settings:
    *
    * ```
    * const options = {
    *   idleOptions: {
-   *     disableIdle: true,
-   *   },
-   * }
-   * ```
-   *
-   * To provide a custom idle callback instead of the default state reset:
-   *
-   * ```
-   * const options = {
-   *   idleOptions: {
-   *     onIdle: () => {
-   *       console.log("Identity expired");
-   *       // Custom logic here
-   *     },
+   *     disableDefaultIdleCallback: false,
+   *     disableIdle: false,
    *   },
    * }
    * ```
@@ -296,6 +283,9 @@ export const useActor = createUseActorHook<_SERVICE>(actorContext);
   /** Options that determine the behaviour of the {@link AuthClient} login call. These options are a subset of
    * the {@link AuthClientLoginOptions}. */
   loginOptions?: LoginOptions;
+
+  /** Clear the identity automatically on expiration. Default value is `true`. */
+  clearIdentityOnExpiry?: boolean;
 
   /** The child components that the InternetIdentityProvider will wrap. This allows any child
    * component to access the authentication context provided by the InternetIdentityProvider. */
@@ -522,7 +512,7 @@ export const Route = createFileRoute("/about")({
 
 - **Delegation Expiry**: By default, delegations expire after 1 hour and the identity state is automatically reset. Monitor `identity` for changes and handle re-authentication.
 - **Secure Storage**: Identities are stored in browser local storage. Consider the security implications for your use case.
-- **Session Management**: The library enables automatic identity reset on expiry by default. To disable, set `createOptions.idleOptions.disableIdle: true`. Consider your app's security requirements.
+- **Session Management**: The library automatically clears the identity on expiry by default. To disable, set `clearIdentityOnExpiry={false}` on the `InternetIdentityProvider`. Consider your app's security requirements.
 
 ## Updates
 

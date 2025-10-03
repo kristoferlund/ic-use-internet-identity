@@ -7,12 +7,13 @@ import {
   type AuthClientLoginOptions,
 } from "@dfinity/auth-client";
 import type { LoginOptions } from "./login-options.type";
-import type { Identity } from "@dfinity/agent";
+import { HttpAgent, type Identity } from "@dfinity/agent";
 import { type InternetIdentityContext, type Status } from "./context.type";
 import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
-const ONE_HOUR_IN_NANOSECONDS = BigInt(3_600_000_000_000);
 const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
+const ONE_HOUR_NS = BigInt(3_600_000_000_000);
+const EXPIRY_BUFFER_MS = 10 * 1000;
 
 export interface StoreContext {
   providerComponentPresent: boolean;
@@ -22,6 +23,7 @@ export interface StoreContext {
   status: Status;
   error?: Error;
   identity?: Identity;
+  clearIdentityOnExpiry: boolean;
 }
 
 type StoreEvent = { type: "setState" } & Partial<StoreContext>;
@@ -34,6 +36,7 @@ const initialContext: StoreContext = {
   status: "initializing",
   error: undefined,
   identity: undefined,
+  clearIdentityOnExpiry: true,
 };
 
 const store = createStore({
@@ -45,6 +48,62 @@ const store = createStore({
     }),
   },
 });
+
+let expiryTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+function nsToMs(ns: bigint): number {
+  return Number(ns / 1_000_000n);
+}
+
+/**
+ * Schedules automatic clearing of the identity before it expires.
+ * 
+ * Calculates the time difference between client and IC system time to ensure
+ * accurate expiration timing. Uses the earliest expiration from the delegation
+ * chain, or falls back to the provided TTL. Clears any existing scheduled timeout
+ * before scheduling a new one.
+ * 
+ * @param identity - The identity to schedule clearing for
+ * @param fallbackTtlNs - Optional fallback TTL in nanoseconds if delegation chain unavailable
+ */
+async function scheduleClearForIdentity(identity: Identity, fallbackTtlNs?: bigint): Promise<void> {
+  if (expiryTimeoutId) {
+    clearTimeout(expiryTimeoutId);
+    expiryTimeoutId = null;
+  }
+
+  // Get the time drift between client system time and IC system time
+  const agent = await HttpAgent.create({
+    shouldFetchRootKey: process.env.DFX_NETWORK !== "ic",
+  });
+  await agent.syncTime();
+  const timeDiff = agent.getTimeDiffMsecs();
+
+  let delay: number | null = null;
+
+  if (identity instanceof DelegationIdentity) {
+    const chain = identity.getDelegation();
+    let minExp: bigint | null = null;
+    for (const d of chain.delegations) {
+      const exp = d.delegation.expiration;
+      if (minExp === null || exp < minExp) {
+        minExp = exp;
+      }
+    }
+    if (minExp !== null) {
+      delay = Math.max(0, nsToMs(minExp) - Date.now() - timeDiff - EXPIRY_BUFFER_MS);
+    }
+  }
+
+  if (delay === null && fallbackTtlNs !== undefined) {
+    delay = Math.max(0, nsToMs(fallbackTtlNs) - timeDiff - EXPIRY_BUFFER_MS);
+  }
+
+  if (delay !== null) {
+    expiryTimeoutId = setTimeout(clear, delay);
+  }
+}
+
 
 /**
  * Initialization promise handling
@@ -135,23 +194,12 @@ export function getIdentity(): Identity | undefined {
  * Create the auth client with default options or options provided by the user.
  */
 async function createAuthClient(): Promise<AuthClient> {
-  const loginOptions = store.getSnapshot().context.loginOptions;
   const createOptions = store.getSnapshot().context.createOptions;
   const options: AuthClientCreateOptions = {
     idleOptions: {
-      // Default behaviour of this hook is to reset the identity when it reaches `maxTimeToLive` 
-      idleTimeout: loginOptions?.maxTimeToLive ? Number(loginOptions.maxTimeToLive / 1_000_000n) : undefined,
-      // The identity reset behaviour can be prevented by setting `idleOptions.disableIdle = true`
-      onIdle: createOptions?.idleOptions?.disableIdle ? undefined : async () => {
-        const authClient = await createAuthClient();
-        store.send({
-          type: "setState",
-          authClient,
-          identity: undefined,
-          status: "idle" as const,
-          error: undefined,
-        });
-      },
+      // Default behaviour of this hook is not to logout and reload window on user being idle
+      disableDefaultIdleCallback: true,
+      disableIdle: true,
       ...createOptions?.idleOptions,
     },
     ...createOptions,
@@ -222,7 +270,7 @@ function login(): void {
     identityProvider: DEFAULT_IDENTITY_PROVIDER,
     onSuccess: onLoginSuccess,
     onError: onLoginError,
-    maxTimeToLive: ONE_HOUR_IN_NANOSECONDS,
+    maxTimeToLive: ONE_HOUR_NS,
     ...context.loginOptions,
   };
 
@@ -234,12 +282,18 @@ function login(): void {
 /**
  * Callback, login was successful. Saves identity to state.
  */
-function onLoginSuccess(): void {
-  const identity = store.getSnapshot().context.authClient?.getIdentity();
+async function onLoginSuccess(): Promise<void> {
+  const context = store.getSnapshot().context;
+  const identity = context.authClient?.getIdentity();
   if (!identity) {
     setError("Identity not found after successful login");
     return;
   }
+
+  if (context.clearIdentityOnExpiry) {
+    await scheduleClearForIdentity(identity, context.loginOptions?.maxTimeToLive ?? ONE_HOUR_NS);
+  }
+
   store.send({
     type: "setState",
     identity,
@@ -264,6 +318,11 @@ function clear(): void {
   if (!authClient) {
     setError("Auth client not initialized");
     return;
+  }
+
+  if (expiryTimeoutId) {
+    clearTimeout(expiryTimeoutId);
+    expiryTimeoutId = null;
   }
 
   void authClient
@@ -333,6 +392,7 @@ export function InternetIdentityProvider({
   children,
   createOptions,
   loginOptions,
+  clearIdentityOnExpiry = true,
 }: {
   /** The child components that the InternetIdentityProvider will wrap. This allows any child
    * component to access the authentication context provided by the InternetIdentityProvider. */
@@ -358,6 +418,9 @@ export function InternetIdentityProvider({
    * the {@link AuthClientLoginOptions}.
    */
   loginOptions?: LoginOptions;
+
+  /** Clear the identity automatically on expiration. Default value is `true`. */
+  clearIdentityOnExpiry?: boolean;
 }) {
   // Effect runs on mount. Creates an AuthClient and attempts to load a saved identity.
   useEffect(() => {
@@ -372,12 +435,18 @@ export function InternetIdentityProvider({
           status: "initializing" as const,
           createOptions,
           loginOptions,
+          clearIdentityOnExpiry,
         });
         let authClient = store.getSnapshot().context.authClient;
         authClient ??= await createAuthClient();
 
         if (await authClient.isAuthenticated()) {
           const identity = authClient.getIdentity();
+
+          if (clearIdentityOnExpiry) {
+            await scheduleClearForIdentity(identity);
+          }
+
           store.send({
             type: "setState",
             identity,
@@ -420,7 +489,7 @@ export function InternetIdentityProvider({
         }
       }
     })();
-  }, [createOptions, loginOptions]);
+  }, [createOptions, loginOptions, clearIdentityOnExpiry]);
 
   return children;
 }
