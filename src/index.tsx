@@ -13,7 +13,7 @@ import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
 
 const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
 const ONE_HOUR_NS = BigInt(3_600_000_000_000);
-const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+const EXPIRY_BUFFER_MS = 10 * 1000;
 
 export interface StoreContext {
   providerComponentPresent: boolean;
@@ -419,9 +419,7 @@ export function InternetIdentityProvider({
    */
   loginOptions?: LoginOptions;
 
-  /** Clear the identity automatically on expiration. Default value is `true`. The identity is cleared five minutes
-   * before the identity expires to avoid any issues with ICP system time and local time being out of sync.
-   */
+  /** Clear the identity automatically on expiration. Default value is `true`. */
   clearIdentityOnExpiry?: boolean;
 }) {
   // Effect runs on mount. Creates an AuthClient and attempts to load a saved identity.

@@ -284,8 +284,7 @@ export const useActor = createUseActorHook<_SERVICE>(actorContext);
    * the {@link AuthClientLoginOptions}. */
   loginOptions?: LoginOptions;
 
-  /** Clear the identity automatically on expiration. Default value is `true`. The identity is cleared five minutes
-   * before the identity expires to avoid any issues with ICP system time and local time being out of sync. */
+  /** Clear the identity automatically on expiration. Default value is `true`. */
   clearIdentityOnExpiry?: boolean;
 
   /** The child components that the InternetIdentityProvider will wrap. This allows any child
@@ -513,7 +512,7 @@ export const Route = createFileRoute("/about")({
 
 - **Delegation Expiry**: By default, delegations expire after 1 hour and the identity state is automatically reset. Monitor `identity` for changes and handle re-authentication.
 - **Secure Storage**: Identities are stored in browser local storage. Consider the security implications for your use case.
-- **Session Management**: The library automatically clears the identity five minutes before expiry by default. To disable, set `clearIdentityOnExpiry={false}` on the `InternetIdentityProvider`. Consider your app's security requirements.
+- **Session Management**: The library automatically clears the identity on expiry by default. To disable, set `clearIdentityOnExpiry={false}` on the `InternetIdentityProvider`. Consider your app's security requirements.
 
 ## Updates
 
