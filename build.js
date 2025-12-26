@@ -9,9 +9,8 @@ void esbuild.build({
   external: [
     "react",
     "react-dom",
-    "@dfinity/agent",
-    "@dfinity/auth-client",
-    "@dfinity/identity",
+    "@icp-sdk/auth",
+    "@icp-sdk/core",
   ],
   plugins: [],
 });

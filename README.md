@@ -50,10 +50,10 @@
 pnpm install ic-use-internet-identity
 ```
 
-The hook also requires the following `@dfinity/x` packages to be installed with a version of at least `3.1.0`:
+The hook also requires the following `@icp-sdk/x` packages to be installed with a version of at least `v5`:
 
 ```bash
-pnpm install @dfinity/agent @dfinity/auth-client @dfinity/identity @dfinity/candid
+pnpm install @icp-sdk/core @icp-sdk/auth
 ```
 
 ## Usage
@@ -295,10 +295,10 @@ export const useActor = createUseActorHook<_SERVICE>(actorContext);
 
 ## LoginOptions
 
-The `LoginOptions` interface extends `AuthClientLoginOptions` from `@dfinity/auth-client` with some modifications:
+The `LoginOptions` interface extends `AuthClientLoginOptions` from `@icp-sdk/auth/client` with some modifications:
 
 ```ts
-import type { AuthClientLoginOptions } from "@dfinity/auth-client";
+import type { AuthClientLoginOptions } from "@icp-sdk/auth/client";
 
 export interface LoginOptions
   extends Omit<
