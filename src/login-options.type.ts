@@ -1,4 +1,4 @@
-import type { AuthClientLoginOptions } from "@dfinity/auth-client";
+import type { AuthClientLoginOptions } from "@icp-sdk/auth/client";
 
 export interface LoginOptions
   extends Omit<

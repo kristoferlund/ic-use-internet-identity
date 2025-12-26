@@ -5,11 +5,11 @@ import {
   AuthClient,
   type AuthClientCreateOptions,
   type AuthClientLoginOptions,
-} from "@dfinity/auth-client";
+} from "@icp-sdk/auth/client";
 import type { LoginOptions } from "./login-options.type";
-import { HttpAgent, type Identity } from "@dfinity/agent";
+import { HttpAgent, type Identity } from "@icp-sdk/core/agent";
 import { type InternetIdentityContext, type Status } from "./context.type";
-import { DelegationIdentity, isDelegationValid } from "@dfinity/identity";
+import { DelegationIdentity, isDelegationValid } from "@icp-sdk/core/identity";
 
 const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
 const ONE_HOUR_NS = BigInt(3_600_000_000_000);

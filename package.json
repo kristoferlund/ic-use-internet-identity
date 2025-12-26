@@ -33,16 +33,14 @@
     "@xstate/store": "^3.8.5"
   },
   "peerDependencies": {
-    "@dfinity/agent": "^3",
-    "@dfinity/auth-client": "^3",
-    "@dfinity/identity": "^3",
+    "@icp-sdk/auth": "^5",
+    "@icp-sdk/core": "^5",
     "react": ">=18.0.0"
   },
   "devDependencies": {
-    "@dfinity/agent": "^3.2.7",
-    "@dfinity/auth-client": "^3.2.7",
-    "@dfinity/identity": "^3.2.7",
     "@eslint/js": "^9.26.0",
+    "@icp-sdk/auth": "^5.0.0",
+    "@icp-sdk/core": "^5.0.0",
     "@types/node": "^20.10.6",
     "@types/react": "^18.2.39",
     "esbuild": "^0.19.5",
