@@ -32,6 +32,7 @@
   - [LoginOptions](#loginoptions)
   - [useInternetIdentity interface](#useinternetidentity-interface)
   - [Error Handling](#error-handling)
+  - [Session Expiration](#session-expiration)
   - [Router integration](#router-integration)
     - [Available Functions](#available-functions)
     - [Basic Example](#basic-example)
@@ -343,6 +344,10 @@ export type InternetIdentityContext = {
   /** Clears the identity from the state and local storage. Effectively "logs the user out". */
   clear: () => void;
 
+  /** Get the delegation chain from the current identity. Useful for accessing session expiration.
+   * Returns undefined if not authenticated or not a DelegationIdentity. */
+  getDelegation: () => DelegationChain | undefined;
+
   /** The status of the login process. Note: The login status is not affected when a stored
    * identity is loaded on mount. */
   status: Status;
@@ -396,6 +401,77 @@ export function LoginComponent() {
 }
 ```
 
+## Session Expiration
+
+The library provides `getDelegation()` to access the delegation chain, which contains session expiration information. This is useful for displaying session timeouts to users or implementing custom expiration handling.
+
+> [!IMPORTANT]
+> **Check All Delegations**: A delegation chain can contain multiple delegations. Always iterate through all of them to find the earliest expiration time, as the entire chain becomes invalid when ANY delegation expires.
+
+### Using the Hook
+
+```tsx
+import { useInternetIdentity } from "ic-use-internet-identity";
+import { useEffect, useState } from "react";
+
+export function SessionTimer() {
+  const { getDelegation } = useInternetIdentity();
+  const [expiresAt, setExpiresAt] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const delegation = getDelegation();
+    if (delegation && delegation.delegations.length > 0) {
+      // Find the earliest expiration in the chain
+      let minExpiration: bigint | null = null;
+      
+      for (const d of delegation.delegations) {
+        const exp = d.delegation.expiration;
+        if (minExpiration === null || exp < minExpiration) {
+          minExpiration = exp;
+        }
+      }
+      
+      if (minExpiration !== null) {
+        // Convert nanoseconds to milliseconds
+        setExpiresAt(new Date(Number(minExpiration / 1_000_000n)));
+      }
+    }
+  }, [getDelegation]);
+
+  if (!expiresAt) return null;
+
+  return (
+    <div>
+      Session expires at: {expiresAt.toLocaleString()}
+    </div>
+  );
+}
+```
+
+### Using Outside React Components
+
+```typescript
+import { getDelegation } from "ic-use-internet-identity";
+
+const delegation = getDelegation();
+if (delegation && delegation.delegations.length > 0) {
+  // Find the earliest expiration
+  const minExpiration = delegation.delegations.reduce((min, d) => {
+    const exp = d.delegation.expiration;
+    return min === null || exp < min ? exp : min;
+  }, null as bigint | null);
+  
+  if (minExpiration) {
+    const expiresAt = new Date(Number(minExpiration / 1_000_000n));
+    console.log('Session expires at:', expiresAt);
+  }
+}
+```
+
+### Automatic Expiration Handling
+
+By default, the library automatically clears the identity when the session expires (`clearIdentityOnExpiry={true}`). The `identity` will become `undefined` when this happens, triggering re-renders in your components. You typically don't need to manually monitor expiration unless you want to show countdown timers or warnings to users.
+
 ## Router integration
 
 When using `ic-use-internet-identity` with routing libraries (for example, TanStack Router), it's recommended to handle the initialization phase before allowing navigation to protected routes. The library exports utility functions that work outside of React components and can be used with many routing libraries — TanStack Router is shown here as an example.
@@ -411,6 +487,9 @@ isAuthenticated(): boolean
 
 // Get the current identity 
 getIdentity(): Identity | undefined
+
+// Get the delegation chain (useful for checking session expiration)
+getDelegation(): DelegationChain | undefined
 ```
 
 ### Basic Example
@@ -510,7 +589,7 @@ export const Route = createFileRoute("/about")({
 
 ## Security Considerations
 
-- **Delegation Expiry**: By default, delegations expire after 1 hour and the identity state is automatically reset. Monitor `identity` for changes and handle re-authentication.
+- **Delegation Expiry**: By default, delegations expire after 1 hour and the identity state is automatically reset. Monitor `identity` for changes and handle re-authentication. Use `getDelegation()` to access the exact expiration time if needed.
 - **Secure Storage**: Identities are stored in browser local storage. Consider the security implications for your use case.
 - **Session Management**: The library automatically clears the identity on expiry by default. To disable, set `clearIdentityOnExpiry={false}` on the `InternetIdentityProvider`. Consider your app's security requirements.
 
