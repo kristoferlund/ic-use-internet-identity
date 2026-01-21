@@ -9,7 +9,7 @@ import {
 import type { LoginOptions } from "./login-options.type";
 import { HttpAgent, type Identity } from "@icp-sdk/core/agent";
 import { type InternetIdentityContext, type Status } from "./context.type";
-import { DelegationIdentity, isDelegationValid } from "@icp-sdk/core/identity";
+import { DelegationIdentity, isDelegationValid, type DelegationChain } from "@icp-sdk/core/identity";
 
 const DEFAULT_IDENTITY_PROVIDER = "https://identity.ic0.app";
 const ONE_HOUR_NS = BigInt(3_600_000_000_000);
@@ -193,6 +193,30 @@ export function getIdentity(): Identity | undefined {
 }
 
 /**
+ * Get the delegation chain from the current identity.
+ * This can be used to access information like session expiration.
+ * This can be used outside of React components.
+ *
+ * @example
+ * ```ts
+ * const delegation = getDelegation();
+ * if (delegation) {
+ *   const expiration = delegation.delegations[0]?.delegation.expiration;
+ *   console.log('Session expires at:', new Date(Number(expiration / 1_000_000n)));
+ * }
+ * ```
+ *
+ * @returns The delegation chain or undefined if not authenticated or not a DelegationIdentity
+ */
+export function getDelegation(): DelegationChain | undefined {
+  const identity = store.getSnapshot().context.identity;
+  if (identity instanceof DelegationIdentity) {
+    return identity.getDelegation();
+  }
+  return undefined;
+}
+
+/**
  * Create the auth client with default options or options provided by the user.
  */
 async function createAuthClient(): Promise<AuthClient> {
@@ -358,6 +382,7 @@ export const useInternetIdentity = (): InternetIdentityContext => {
     identity: context.identity,
     login,
     clear,
+    getDelegation,
     status: context.status,
     isInitializing: context.status === "initializing",
     isIdle: context.status === "idle",
